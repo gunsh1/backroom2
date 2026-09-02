@@ -110,7 +110,19 @@ namespace Backrooms.EditorTools
 
                 bool wantShadow = shadowed < 4 && p.z < 8f;
                 light.shadows = wantShadow ? LightShadows.Soft : LightShadows.None;
-                if (wantShadow) { try { hd.SetShadowResolution(1024); } catch { } shadowed++; }
+                if (wantShadow)
+                {
+                    try
+                    {
+                        hd.SetShadowResolution(1024);
+                        // ライト側の既定は override=false。ここを立てないと
+                        // Volume の ContactShadows は一切効かない。
+                        hd.useContactShadow.useOverride = true;
+                        hd.useContactShadow.@override = true;
+                    }
+                    catch { }
+                    shadowed++;
+                }
                 made++;
             }
             Log.Add($"lights: {made} area lights ({shadowed} casting shadows)");
@@ -182,7 +194,9 @@ namespace Backrooms.EditorTools
             // 実際の屋内には必ず埃と湿気があり、遠景がわずかに霞む。
             var fog = AddOverride<Fog>(profile);
             Set(fog, "enabled", true);
-            Set(fog, "meanFreePath", 95f);
+            // 95m はほぼ真空で、遠くの壁がコントラストを一切失わなかった。
+            // 実際の屋内は埃と湿気で 40-60m 相当。
+            Set(fog, "meanFreePath", 55f);   // 旧 95
             Set(fog, "baseHeight", 0f);
             Set(fog, "maximumHeight", 40f);
             Set(fog, "enableVolumetricFog", true);
@@ -212,6 +226,31 @@ namespace Backrooms.EditorTools
             var vig = AddOverride<Vignette>(profile);
             Set(vig, "intensity", 0.13f);     // レンズの周辺光量落ち
             Set(vig, "smoothness", 0.55f);
+
+            // --- 接地影 -------------------------------------------------
+            // エリアライトの柔らかい影だけだと、柱や幅木の足元が床から浮いて見える。
+            // 長さは接地部だけに効く 0.10m に留める。
+            var cs = AddOverride<ContactShadows>(profile);
+            Set(cs, "enable", true);
+            Set(cs, "length", 0.10f);
+            Set(cs, "opacity", 0.85f);
+            Set(cs, "distanceScaleFactor", 0.5f);
+            Set(cs, "maxDistance", 18f);
+            Set(cs, "thicknessScale", 0.15f);
+
+            // --- センサーノイズ -------------------------------------------
+            // 完全に清潔な画は必ず CG に見える。実写は暗部に必ず粒子が乗る。
+            // ISO 400 程度の控えめな量から始める。
+            var grain = AddOverride<FilmGrain>(profile);
+            Set(grain, "type", (int)FilmGrainLookup.Thin1);
+            Set(grain, "intensity", 0.12f);
+            Set(grain, "response", 0.75f);
+
+            // --- レンズの歪曲 ---------------------------------------------
+            // 24mm 相当なのに直線が完全な直線なのは実在のレンズではありえない。
+            var dist = AddOverride<LensDistortion>(profile);
+            Set(dist, "intensity", -0.08f);   // 樽型をごく僅かに
+            Set(dist, "scale", 1.0f);
 
             var mb = AddOverride<MotionBlur>(profile);
             Set(mb, "intensity", 0.22f);
@@ -281,6 +320,7 @@ namespace Backrooms.EditorTools
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.SSR, true);
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.Volumetrics, true);
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.ScreenSpaceShadows, true);
+                camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.ContactShadows, true);
 
                 var mask = camData.renderingPathCustomFrameSettingsOverrideMask;
                 mask.mask[(uint)FrameSettingsField.RayTracing] = true;
@@ -288,6 +328,7 @@ namespace Backrooms.EditorTools
                 mask.mask[(uint)FrameSettingsField.SSR] = true;
                 mask.mask[(uint)FrameSettingsField.Volumetrics] = true;
                 mask.mask[(uint)FrameSettingsField.ScreenSpaceShadows] = true;
+                mask.mask[(uint)FrameSettingsField.ContactShadows] = true;
                 camData.renderingPathCustomFrameSettingsOverrideMask = mask;
                 Log.Add("camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on");
             }

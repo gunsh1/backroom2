@@ -1,5 +1,5 @@
-=== SceneBuilder (photoreal) 2026/09/02 7:42:40 ===
-geometry: 26056 verts / 11976 tris / 26 troffers
+=== SceneBuilder (photoreal) 2026/09/02 21:00:32 ===
+geometry: 27464 verts / 12620 tris / 26 troffers
 lights: 23 area lights (4 casting shadows)
   set  VisualEnvironment.skyType = 0
   set  Exposure.mode = AutomaticHistogram
@@ -34,7 +34,7 @@ lights: 23 area lights (4 casting shadows)
   set  RayTracingSettings.extendShadowCulling = True
   set  RayTracingSettings.extendCameraCulling = True
   set  Fog.enabled = True
-  set  Fog.meanFreePath = 95
+  set  Fog.meanFreePath = 55
   set  Fog.baseHeight = 0
   set  Fog.maximumHeight = 40
   set  Fog.enableVolumetricFog = True
@@ -50,6 +50,17 @@ lights: 23 area lights (4 casting shadows)
   set  ChromaticAberration.intensity = 0.055
   set  Vignette.intensity = 0.13
   set  Vignette.smoothness = 0.55
+  set  ContactShadows.enable = True
+  set  ContactShadows.length = 0.1
+  set  ContactShadows.opacity = 0.85
+  set  ContactShadows.distanceScaleFactor = 0.5
+  set  ContactShadows.maxDistance = 18
+  set  ContactShadows.thicknessScale = 0.15
+  set  FilmGrain.type = Thin1
+  set  FilmGrain.intensity = 0.12
+  set  FilmGrain.response = 0.75
+  set  LensDistortion.intensity = -0.08
+  set  LensDistortion.scale = 1
   set  MotionBlur.intensity = 0.22
   set  ScreenSpaceAmbientOcclusion.intensity = 0.75
   set  ScreenSpaceAmbientOcclusion.radius = 0.45

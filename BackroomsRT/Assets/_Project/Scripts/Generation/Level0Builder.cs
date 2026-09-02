@@ -138,7 +138,8 @@ namespace Backrooms.Generation
                                  false, false, true,  false, false,
                                  false, false, false, false, false,
                                  true,  false, false, false, false },   // 2 灯は切れている
-                         tiles, bars, frames, diffOn, diffOff, res, rnd);
+                         tiles, bars, frames, diffOn, diffOff, res, rnd,
+                         new[] { (3, 3), (15, 11) });   // 点検口
 
             BuildCeiling(roomB, new[] { (6, 16), (12, 16), (6, 20), (12, 20), (6, 24), (12, 24) },
                          new[] { false, false, false, false, true, false },   // 奥の 1 灯は切れている
@@ -152,6 +153,10 @@ namespace Backrooms.Generation
             var plastic = new MeshBuilder();
             var vents = new MeshBuilder();
             BuildServices(roomA, roomB, chrome, plastic, vents);
+            // 人が使っていた痕跡。スイッチ、サーモスタット、配線モール、床の見切り。
+            // 設備が「建物として要る物」なのに対し、こちらは「人が触った物」で、
+            // 無いと空間が『誰も居ない』ではなく『誰も居たことがない』に見える。
+            BuildTraces(roomA, plastic, vents);
             if (!chrome.IsEmpty)
                 MeshKit.Spawn(root.transform, "Sprinklers", chrome.ToMesh("Sprinklers"), mats.Chrome);
             if (!plastic.IsEmpty)
@@ -239,6 +244,67 @@ namespace Backrooms.Generation
             AddOutlet(plastic, new Vector3(9.20f, 0.30f, 0.002f), false);
         }
 
+        /// <summary>
+        /// 人が触った物。壁付けのスイッチ類・配線モール・床の見切り。
+        /// 実在の建物にこれらが無いことはなく、逆にこれが無いと
+        /// どれだけ材質を詰めても「使われたことのない箱」に見える。
+        /// </summary>
+        static void BuildTraces(Room a, MeshBuilder plastic, MeshBuilder metal)
+        {
+            // --- 照明スイッチ（開口の脇、床上 1.25m）---
+            // 北壁の室内側は z = a.Z1。室内は z が小さい側なので -Z 方向に出す。
+            AddPlate(plastic, new Vector3(7.05f, 1.25f, a.Z1), Axis.Z, -1f, 0.086f, 0.122f);
+            for (int i = 0; i < 2; i++)   // 2 連のロッカースイッチ
+            {
+                float cx = 7.05f + (i == 0 ? -0.020f : 0.020f);
+                plastic.BeveledBox(new Vector3(cx - 0.016f, 1.25f - 0.030f, a.Z1 - 0.014f),
+                                   new Vector3(cx + 0.016f, 1.25f + 0.030f, a.Z1 - 0.006f),
+                                   0.0012f, 0.25f);
+            }
+
+            // --- サーモスタット（西壁、床上 1.50m）---
+            AddPlate(plastic, new Vector3(a.X0, 1.50f, 4.20f), Axis.X, 1f, 0.088f, 0.088f);
+            // 表示窓はプレート面 (X0 + 0.010) より前に出さないと埋もれる
+            plastic.BeveledBox(new Vector3(a.X0 + 0.010f, 1.50f - 0.014f, 4.20f - 0.026f),
+                               new Vector3(a.X0 + 0.0125f, 1.50f + 0.010f, 4.20f + 0.026f),
+                               0.0008f, 0.25f);   // 表示窓
+
+            // --- 配線モール（西壁、幅木の上を這わせる）---
+            // 後から増設した LAN の配線。オフィスでは必ず見る。
+            const float MouldY = BaseH + 0.012f, MouldH = 0.026f, MouldD = 0.020f;
+            plastic.BeveledBox(new Vector3(a.X0, MouldY, 2.20f),
+                               new Vector3(a.X0 + MouldD, MouldY + MouldH, 6.50f), 0.0015f, 0.5f);
+            // 立ち上がりでコンセント高さまで上げる
+            plastic.BeveledBox(new Vector3(a.X0, MouldY, 4.36f),
+                               new Vector3(a.X0 + MouldD, 0.30f, 4.44f), 0.0015f, 0.5f);
+            AddOutlet(plastic, new Vector3(a.X0 + 0.002f, 0.30f, 4.40f), true);
+
+            // --- 床の見切り（開口の敷居）---
+            // 部屋が変われば必ず床材の継ぎ目があり、アルミの見切りが入る。
+            metal.BeveledBox(new Vector3(5.20f, 0f, a.Z1 - 0.004f),
+                             new Vector3(6.80f, 0.004f, a.Z1 + WallT + 0.004f), 0.0008f, 1f);
+        }
+
+        enum Axis { X, Z }
+
+        /// <summary>壁付けのプレート。dir は室内側を向く符号。</summary>
+        static void AddPlate(MeshBuilder m, Vector3 p, Axis axis, float dir, float w, float h)
+        {
+            const float Proud = 0.010f;
+            if (axis == Axis.X)
+            {
+                float x0 = dir > 0 ? p.x : p.x - Proud;
+                m.BeveledBox(new Vector3(x0, p.y - h * 0.5f, p.z - w * 0.5f),
+                             new Vector3(x0 + Proud, p.y + h * 0.5f, p.z + w * 0.5f), 0.0015f, 0.25f);
+            }
+            else
+            {
+                float z0 = dir > 0 ? p.z : p.z - Proud;
+                m.BeveledBox(new Vector3(p.x - w * 0.5f, p.y - h * 0.5f, z0),
+                             new Vector3(p.x + w * 0.5f, p.y + h * 0.5f, z0 + Proud), 0.0015f, 0.25f);
+            }
+        }
+
         /// <summary>2 口コンセント。onXWall=true なら X 固定の壁に、false なら Z 固定の壁に付ける。</summary>
         static void AddOutlet(MeshBuilder m, Vector3 p, bool onXWall)
         {
@@ -271,7 +337,8 @@ namespace Backrooms.Generation
         static void BuildCeiling(Room r, (int, int)[] trofferCells, bool[] dead,
                                  MeshBuilder tiles, MeshBuilder bars, MeshBuilder frames,
                                  MeshBuilder diffOn, MeshBuilder diffOff,
-                                 Result res, System.Random rnd)
+                                 Result res, System.Random rnd,
+                                 (int, int)[] hatches = null)
         {
             int i0 = Mathf.RoundToInt(r.X0 / Cell), i1 = Mathf.RoundToInt(r.X1 / Cell);
             int j0 = Mathf.RoundToInt(r.Z0 / Cell), j1 = Mathf.RoundToInt(r.Z1 / Cell);
@@ -279,6 +346,27 @@ namespace Backrooms.Generation
 
             // トロファーが占める 2 セル分をマークする（x 方向に 2 セル = 1200mm）
             var occupied = new HashSet<(int, int)>();
+
+            // --- 天井点検口 ---
+            // 吊り天井には必ず点検口がある。吸音タイルの代わりに鋼板の蓋が
+            // 落とし込まれ、面が一段下がってヒンジと掛け金が見える。
+            if (hatches != null)
+            {
+                foreach (var (hi, hj) in hatches)
+                {
+                    occupied.Add((hi, hj));
+                    float hx0 = hi * Cell + TBarW * 0.5f, hx1 = (hi + 1) * Cell - TBarW * 0.5f;
+                    float hz0 = hj * Cell + TBarW * 0.5f, hz1 = (hj + 1) * Cell - TBarW * 0.5f;
+                    // 蓋本体（タイル面よりわずかに下がる）
+                    frames.BeveledBox(new Vector3(hx0, H + 0.004f, hz0),
+                                      new Vector3(hx1, H + 0.020f, hz1), 0.0012f, UvMetal);
+                    // 掛け金
+                    frames.BeveledBox(new Vector3((hx0 + hx1) * 0.5f - 0.028f, H - 0.002f, hz0 + 0.012f),
+                                      new Vector3((hx0 + hx1) * 0.5f + 0.028f, H + 0.004f, hz0 + 0.044f),
+                                      0.0008f, UvMetal);
+                }
+            }
+
             for (int t = 0; t < trofferCells.Length; t++)
             {
                 var (ci, cj) = trofferCells[t];
@@ -385,14 +473,16 @@ namespace Backrooms.Generation
             for (int i = i0; i <= i1; i++)
             {
                 float x = Mathf.Clamp(i * Cell, xa, xb);
-                bars.BeveledBox(new Vector3(x - TBarW * 0.5f, H, r.Z0),
-                         new Vector3(x + TBarW * 0.5f, H + TBarH, r.Z1), BevelBar, UvMetal);
+                // 木口も壁面と同一平面にしない。ここを揃えると壁の上端に
+                // 白い点が並んで透ける。
+                bars.BeveledBox(new Vector3(x - TBarW * 0.5f, H, r.Z0 + BarGap),
+                         new Vector3(x + TBarW * 0.5f, H + TBarH, r.Z1 - BarGap), BevelBar, UvMetal);
             }
             for (int j = j0; j <= j1; j++)
             {
                 float z = Mathf.Clamp(j * Cell, za, zb);
-                bars.BeveledBox(new Vector3(r.X0, H, z - TBarW * 0.5f),
-                         new Vector3(r.X1, H + TBarH, z + TBarW * 0.5f), BevelBar, UvMetal);
+                bars.BeveledBox(new Vector3(r.X0 + BarGap, H, z - TBarW * 0.5f),
+                         new Vector3(r.X1 - BarGap, H + TBarH, z + TBarW * 0.5f), BevelBar, UvMetal);
             }
         }
 

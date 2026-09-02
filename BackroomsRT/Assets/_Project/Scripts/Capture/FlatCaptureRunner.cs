@@ -45,6 +45,10 @@ namespace Backrooms.Capture
             new Shot("06_detail",   new Vector3( 1.30f, 0f,  4.20f), 265f,  34f),
             // ライトを点けて RT シャドウと光の落ち方を見る
             new Shot("07_torch",    new Vector3( 5.60f, 0f, 12.40f), 200f,   0f, true),
+            // 人の触った物: 開口脇のスイッチと床の見切り
+            new Shot("08_switch",   new Vector3( 6.90f, 0f,  7.60f),  10f,  -4f),
+            // 西壁の配線モールとサーモスタット
+            new Shot("09_conduit",  new Vector3( 2.20f, 0f,  6.20f), 228f,  14f),
         };
 
         IEnumerator Start()

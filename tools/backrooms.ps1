@@ -1,4 +1,4 @@
-# Backrooms プロジェクトのビルド／キャプチャ実行スクリプト
+﻿# Backrooms プロジェクトのビルド／キャプチャ実行スクリプト
 #
 #   .\tools\backrooms.ps1 setup      HDRP + DXR の設定をやり直す
 #   .\tools\backrooms.ps1 materials  マテリアルを作り直す
@@ -20,9 +20,22 @@ if (-not (Test-Path $Unity))   { throw "Unity が見つからない: $Unity" }
 if (-not (Test-Path $Project)) { throw "プロジェクトが見つからない: $Project" }
 New-Item -ItemType Directory -Force $Artifacts | Out-Null
 
+# エディタが開いたままだとバッチ実行はロックで落ちるが、後続のタスクは
+# そのまま走ってしまい「変更が反映されていない古いキャプチャ」が返る。
+# 一度これで誤った結論を出したので、先頭で必ず止める。
+function Assert-NoEditor {
+    $running = @(Get-CimInstance Win32_Process -Filter "Name='Unity.exe'" -ErrorAction SilentlyContinue |
+                 Where-Object { $_.CommandLine -match [regex]::Escape($Project) -and $_.CommandLine -notmatch '-adb2' })
+    if ($running.Count -gt 0) {
+        $ids = ($running | ForEach-Object { $_.ProcessId }) -join ', '
+        throw "Unity エディタがこのプロジェクトを開いています (PID $ids)。閉じてから実行してください。"
+    }
+}
+
 function Invoke-Unity {
     param([string]$Method, [string]$LogName, [switch]$Gui)
 
+    Assert-NoEditor
     $log = Join-Path $Artifacts $LogName
     $args = @("-projectPath", $Project)
     if (-not $Gui) { $args += @("-batchmode", "-nographics", "-quit") }
@@ -37,6 +50,7 @@ function Invoke-Unity {
         throw "compile failed"
     }
     Write-Host "   exit=$($p.ExitCode)  log=$log" -ForegroundColor DarkGray
+    if ($p.ExitCode -ne 0) { throw "$Method が exit=$($p.ExitCode) で終了した。$log を確認すること。" }
     return $p.ExitCode
 }
 
@@ -46,6 +60,7 @@ switch ($Task) {
     "scene"     { Invoke-Unity "Backrooms.EditorTools.SceneBuilder.Build"          "unity_scene.log" | Out-Null }
     "capture"   { Invoke-Unity "Backrooms.EditorTools.CaptureTool.PlayAndCapture"  "unity_capture.log" -Gui | Out-Null }
     "open" {
+        Assert-NoEditor
         Write-Host "エディタを開く: $Project" -ForegroundColor Cyan
         Start-Process -FilePath $Unity -ArgumentList @("-projectPath", $Project)
         Write-Host "起動しました。" -ForegroundColor Green

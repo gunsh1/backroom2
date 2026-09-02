@@ -39,8 +39,13 @@ namespace Backrooms.EditorTools
             // linear (0.452, 0.356, 0.087) で、青が 2 バウンスで 0.19^2 まで潰れ、
             // 室内全体がセピアに寄っていた。実測した目標 (0.52, 0.45, 0.24) の
             // 半分まで戻す: 実効 (0.487, 0.404, 0.152)、輝度アルベド 0.357 -> 0.404。   // カノンのモノイエロー
-            SetF(wall, "_NormalScale", 0.85f);
-            Smoothness(wall, 0.05f, 0.24f);                            // マットな紙
+            // 法線マップの主要な凹凸は実測で波長 11px = 1.1cm。壁紙のエンボスとして
+            // 妥当なのは 2-8mm なので、そのままの強さだとコテ塗りのスタッコに見える。
+            // タイリング周期を変えずに深さだけ落として粗さの印象を下げる。
+            SetF(wall, "_NormalScale", 0.35f);                         // 旧 0.85
+            // マット塗装でも斜めから見れば広い面のシーンが出る。上限 0.24 では
+            // 完全な拡散反射に見え、全ての面が「紙」になっていた。
+            Smoothness(wall, 0.08f, 0.34f);                            // 旧 0.05 - 0.24
             SetF(wall, "_AORemapMin", 0.55f);
             Detail(wall, detail, uvScale: 2.12f, meters: 11f, albedo: 0.18f, smooth: 0.30f);
             Save(wall);
@@ -89,7 +94,10 @@ namespace Backrooms.EditorTools
 
             // ---------------------------------------------------------- 幅木
             var baseb = Make("M_Baseboard");
-            SetCol(baseb, "_BaseColor", Srgb(0.40f, 0.355f, 0.300f));   // 濃いビニル幅木
+            SetCol(baseb, "_BaseColor", Srgb(0.62f, 0.565f, 0.470f));   // 明るいビニル幅木
+            // 旧 Srgb(0.40, 0.355, 0.300) = linear 0.133。壁の実効アルベド 0.45 に対し
+            // 3.4 倍の差があり、実測でも壁の 1/17.8 (4.2 段下) の黒い帯になって
+            // 部屋を線画のように縁取っていた。linear 0.34 まで上げて 1.35 段戻す。
             SetF(baseb, "_Metallic", 0f);
             SetF(baseb, "_Smoothness", 0.48f);   // 半艶のゴム。面取りに光が乗らないと黒い帯に見える
             Save(baseb);
