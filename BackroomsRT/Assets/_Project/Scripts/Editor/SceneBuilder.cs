@@ -105,10 +105,14 @@ namespace Backrooms.EditorTools
                 }
                 catch (Exception e) { Log.Add("  light setup failed: " + e.Message); }
 
-                light.useColorTemperature = true;
-                light.colorTemperature = 4200f;
-                // 蛍光管はきれいな黒体放射ではなく、緑側に寄った線スペクトルを持つ
-                light.color = new Color(0.96f, 1.0f, 0.94f);
+                // 蛍光灯は黒体放射ではない。水銀の 546nm の輝線が強く出るため、
+                // 色温度では表せない緑寄りの色になる。これが参照の「病んだ黄緑」の
+                // 正体で、黒体の 4200K からは絶対に出ない。
+                // HDRP は color.linear x CCT(T) を掛けるので、色温度を使うと
+                // 必ず黒体の軌跡上に乗ってしまう。ここは色温度を切って直接指定する。
+                // 実効リニア = (0.946, 1.000, 0.778)。R/G = 0.95、B/R = 0.82。
+                light.useColorTemperature = false;
+                light.color = new Color(0.976f, 1.0f, 0.895f);
 
                 bool wantShadow = shadowed < 4 && p.z < 8f;
                 light.shadows = wantShadow ? LightShadows.Soft : LightShadows.None;
@@ -230,7 +234,10 @@ namespace Backrooms.EditorTools
             // (2.8 段上) だが、行き過ぎを避けてまず +1.5 段。
             // 壁は Y=0.164 で参照の 0.54 に対しまだ 1.72 段下。ACES が圧縮する分
             // 入力側は 1.72 段以上要るが、行き過ぎを避けて +1.5 段だけ足す。
-            Set(exp, "compensation", 3.0f);   // 旧 1.5
+            // 参照の壁は sRGB (0.85, 0.83, 0.56) = リニア Y 0.638。
+            // (これまで 0.54 としていたのは私の計算違い。)
+            // 現状 0.568 なのであと 0.17 段。
+            Set(exp, "compensation", 3.2f);   // 旧 1.5 -> 3.0 -> 3.2
             Set(exp, "limitMin", -1.0f);
             Set(exp, "limitMax", 13.5f);
             Set(exp, "adaptationSpeedDarkToLight", 2.0f);

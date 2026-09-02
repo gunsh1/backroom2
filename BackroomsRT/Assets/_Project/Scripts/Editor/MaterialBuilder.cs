@@ -34,7 +34,14 @@ namespace Backrooms.EditorTools
             SetTex(wall, "_BaseColorMap", Tex("Wallpaper001B/Wallpaper_Grimed_Color.png"));
             SetTex(wall, "_NormalMap", Tex("Wallpaper001B/Wallpaper001B_NormalGL_Seamed.png"));
             SetTex(wall, "_MaskMap", Tex("Wallpaper001B/Wallpaper_Grimed_MaskMap.png"));
-            SetCol(wall, "_BaseColor", Srgb(0.881f, 0.838f, 0.780f));
+            SetCol(wall, "_BaseColor", Srgb(0.881f, 0.840f, 0.640f));
+            // 青を 3 回上げたのは、暖色の黒体光源が青を食っていた分の埋め合わせ
+            // だった。光源を蛍光灯の実測色にした今、それが二重に効いて壁が
+            // 白くなった。参照から逆算して戻す:
+            //   render_B/R = albedo_B/R^1.3 x lamp_B/R という実測どおりの関係から
+            //   目標 0.394 / lamp 0.822 -> albedo_B/R = 0.568 (現 0.682)
+            //   同様に R/G は albedo 1.021 (現 1.083)
+            // 実効アルベド (0.520, 0.509, 0.295)。
             // 露出を +3 EV にしたら ACES の脱色が効いて B/R が 0.26 -> 0.44 まで
             // 自力で上がった。残りは実測の応答 (B/R_render はベース色の青の
             // およそ 0.55 乗で動く) から逆算し、青を linear 0.390 -> 0.573 へ。
@@ -62,9 +69,10 @@ namespace Backrooms.EditorTools
             SetTex(carpet, "_NormalMap", Tex("Carpet011/Carpet011_NormalGL.jpg"));
             SetTex(carpet, "_MaskMap", Tex("Carpet011/Carpet011_MaskMap.png"));
             SetTex(carpet, "_HeightMap", Tex("Carpet011/Carpet011_Displacement.jpg"));
-            // Carpet011 の素の色をほぼ通す。ここを暗くしすぎると反射率が 8% まで落ちて
-            // 床が黒く沈む（業務用カーペットの実測は 15〜20%）。
-            SetCol(carpet, "_BaseColor", Srgb(0.90f, 0.86f, 0.76f));
+            SetCol(carpet, "_BaseColor", Srgb(0.78f, 0.72f, 0.60f));
+            // 参照では床は壁より暗い。こちらは器具の真下で受けるぶん
+            // Y=0.639 と壁 (0.508) より明るくなっていた。
+            // 輝度アルベド 0.247 -> 0.167 (業務用カーペットの実測 15-20% の範囲)。
             SetF(carpet, "_NormalScale", 1.0f);
             // 毛足には向きがある。見る角度で明るさが変わるのが本物の手掛かりで、
             // 等方的な粒のままだと「床のテクスチャ」にしか見えない。
@@ -107,7 +115,10 @@ namespace Backrooms.EditorTools
 
             // ---------------------------------------------------------- 幅木
             var baseb = Make("M_Baseboard");
-            SetCol(baseb, "_BaseColor", Srgb(0.62f, 0.565f, 0.470f));   // 明るいビニル幅木
+            SetCol(baseb, "_BaseColor", Srgb(0.80f, 0.755f, 0.640f));   // 淡いタンのビニル幅木
+            // 参照の幅木は壁とほとんど見分けがつかない淡いタン。
+            // linear 0.342 -> 0.603 (+0.82 段)。残る差は床際の接地 AO なので
+            // アルベドで詰められるのはここまで。
             // 旧 Srgb(0.40, 0.355, 0.300) = linear 0.133。壁の実効アルベド 0.45 に対し
             // 3.4 倍の差があり、実測でも壁の 1/17.8 (4.2 段下) の黒い帯になって
             // 部屋を線画のように縁取っていた。linear 0.34 まで上げて 1.35 段戻す。
