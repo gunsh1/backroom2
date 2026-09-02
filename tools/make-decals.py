@@ -102,4 +102,18 @@ alpha = np.clip((1.0 - d / 0.34), 0, 1) ** 0.8 * (0.7 + 0.3 * n) * 0.65
 rgb = np.dstack([np.full((N, N), 0.46), np.full((N, N), 0.40), np.full((N, N), 0.29)])
 save('Decal_Dent', rgb, alpha)
 
+# --- 掃除機の筋 --------------------------------------------------------------
+# 毛足が交互に逆向きに寝るので、色ではなく艶が縞になる。
+# アルベドには効かせず、平滑度だけを縞状に上げる。
+N = 1024
+yy, xx = np.mgrid[0:N, 0:N] / (N - 1.0)
+n = fbm((N, N), octaves=4)
+BANDS = 10                                  # 3m の投影に対して 0.30m ピッチ
+stripe = 0.5 + 0.5 * np.cos(yy * BANDS * 2 * np.pi)
+edge = np.clip(np.minimum(xx / 0.10, (1 - xx) / 0.10), 0, 1)
+ends = np.clip(np.minimum(yy / 0.10, (1 - yy) / 0.10), 0, 1)
+alpha = stripe * edge * ends * (0.6 + 0.4 * n) * 0.45
+rgb = np.dstack([np.full((N, N), 0.50), np.full((N, N), 0.44), np.full((N, N), 0.32)])
+save('Decal_Vacuum', rgb, alpha)
+
 print('出力先:', OUT)

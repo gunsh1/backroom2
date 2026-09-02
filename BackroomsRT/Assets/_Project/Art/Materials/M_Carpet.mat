@@ -17,6 +17,7 @@ Material:
   - _DISPLACEMENT_LOCK_TILING_SCALE
   - _HEIGHTMAP
   - _MASKMAP
+  - _MATERIAL_FEATURE_ANISOTROPY
   - _NORMALMAP
   - _NORMALMAP_TANGENT_SPACE
   - _PIXEL_DISPLACEMENT
@@ -149,7 +150,7 @@ Material:
     - _AlphaRemapMax: 1
     - _AlphaRemapMin: 0
     - _AlphaSrcBlend: 1
-    - _Anisotropy: 0
+    - _Anisotropy: 0.6
     - _BlendMode: 0
     - _CoatMask: 0
     - _CullMode: 2
@@ -191,7 +192,7 @@ Material:
     - _IridescenceMask: 1
     - _IridescenceThickness: 1
     - _LinkDetailsWithBase: 0
-    - _MaterialID: 1
+    - _MaterialID: 2
     - _Metallic: 0
     - _MetallicRemapMax: 1
     - _MetallicRemapMin: 0

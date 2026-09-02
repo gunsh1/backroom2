@@ -34,7 +34,13 @@ namespace Backrooms.EditorTools
             SetTex(wall, "_BaseColorMap", Tex("Wallpaper001B/Wallpaper_Grimed_Color.png"));
             SetTex(wall, "_NormalMap", Tex("Wallpaper001B/Wallpaper001B_NormalGL_Seamed.png"));
             SetTex(wall, "_MaskMap", Tex("Wallpaper001B/Wallpaper_Grimed_MaskMap.png"));
-            SetCol(wall, "_BaseColor", Srgb(0.881f, 0.814f, 0.656f));
+            SetCol(wall, "_BaseColor", Srgb(0.881f, 0.838f, 0.780f));
+            // 露出を +3 EV にしたら ACES の脱色が効いて B/R が 0.26 -> 0.44 まで
+            // 自力で上がった。残りは実測の応答 (B/R_render はベース色の青の
+            // およそ 0.55 乗で動く) から逆算し、青を linear 0.390 -> 0.573 へ。
+            // 予測 B/R = 0.54。
+            // 参照の 0.65 まで行くには壁紙をほぼ白にする必要があり、その場合
+            // 黄色は全て照明と GI が作ることになる。行き過ぎを避けて一段手前で止める。
             // 前回は目標の半分で止めた。実効アルベドは linear (0.487, 0.404, 0.152)
             // で B/R = 0.31、レンダでは 0.21 までしか出ず参照の 0.65 に遠い。
             // 残り半分を戻して実効 (0.52, 0.45, 0.24)、B/R = 0.46 にする。
@@ -60,6 +66,12 @@ namespace Backrooms.EditorTools
             // 床が黒く沈む（業務用カーペットの実測は 15〜20%）。
             SetCol(carpet, "_BaseColor", Srgb(0.90f, 0.86f, 0.76f));
             SetF(carpet, "_NormalScale", 1.0f);
+            // 毛足には向きがある。見る角度で明るさが変わるのが本物の手掛かりで、
+            // 等方的な粒のままだと「床のテクスチャ」にしか見えない。
+            // UV はワールド XZ 投影なので、接線はワールド X に揃う
+            // = 一方向に敷いたロールカーペットと同じになる。
+            SetF(carpet, "_MaterialID", 2f);      // 2 = Anisotropy
+            SetF(carpet, "_Anisotropy", 0.60f);
             Smoothness(carpet, 0.06f, 0.30f);                           // 湿った分だけ上限を上げる
             SetF(carpet, "_AORemapMin", 0.40f);
             // 視差オクルージョン（毛足の奥行き）。控えめに開始する。
@@ -86,7 +98,9 @@ namespace Backrooms.EditorTools
 
             // -------------------------------------------- T バー／トロファー枠
             var metal = Make("M_GridMetal");
-            SetCol(metal, "_BaseColor", Srgb(0.760f, 0.745f, 0.690f));  // 黄ばんだ古い塗装鋼板
+            SetCol(metal, "_BaseColor", Srgb(0.845f, 0.830f, 0.775f));  // 白塗装鋼板
+            // 実測では T バーはタイルの 0.45 段下で、これは実物どおり。
+            // ただし素の反射率が linear 0.53 と低かったので、白塗装の 0.69 に寄せる。
             SetF(metal, "_Metallic", 0f);
             SetF(metal, "_Smoothness", 0.30f);   // 埃を被った塗装は光らない
             Save(metal);
@@ -126,6 +140,8 @@ namespace Backrooms.EditorTools
             // 踏み倒された毛足は寝て光を返すので、通行帯だけ艶が上がる
             MakeDecal("M_Decal_Traffic", "Decals/Decal_Traffic.png", 0.70f, smooth: 0.40f);
             MakeDecal("M_Decal_Dent",    "Decals/Decal_Dent.png",    0.65f, smooth: 0.55f);
+            // 掃除機の筋は色ではなく艶の縞。アルベドには効かせない。
+            MakeDecal("M_Decal_Vacuum",  "Decals/Decal_Vacuum.png",  0.60f, smooth: 0.44f, albedo: false);
 
             // ------------------------------------------------------ 設備の材質
             // 古い建物のスプリンクラーは真鍮。クロームより時代が出る。
@@ -196,7 +212,7 @@ namespace Backrooms.EditorTools
         /// HDRP/Decal のマテリアル。アルベドと平滑度だけに効かせ、法線は触らない。
         /// 法線まで足すと、下地の壁紙のエンボスと二重になって濁る。
         /// </summary>
-        static void MakeDecal(string name, string tex, float blend, float smooth)
+        static void MakeDecal(string name, string tex, float blend, float smooth, bool albedo = true)
         {
             var m = Make(name, "HDRP/Decal");
             if (m == null) return;
@@ -208,7 +224,7 @@ namespace Backrooms.EditorTools
             // 0 = ベースカラーの α を被覆率として使う。
             SetF(m, "_MaskBlendSrc", 0f);
             SetF(m, "_NormalBlendSrc", 0f);
-            SetF(m, "_AffectAlbedo", 1f);
+            SetF(m, "_AffectAlbedo", albedo ? 1f : 0f);
             SetF(m, "_AffectNormal", 0f);
             SetF(m, "_AffectMetal", 0f);
             SetF(m, "_AffectAO", 0f);

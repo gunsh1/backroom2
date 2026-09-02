@@ -13,4 +13,4 @@ shot: 06_detail  pos=(1.30, 0.00, 4.20) yaw=265 pitch=34
 shot: 07_torch  pos=(5.60, 0.00, 12.40) yaw=200 pitch=0  torch=ON
 shot: 08_switch  pos=(6.90, 0.00, 7.60) yaw=10 pitch=-4
 shot: 09_conduit  pos=(2.20, 0.00, 6.20) yaw=228 pitch=14
-fps: avg=41.8  worst frame=38.1 ms  (180 frames)   [1920x1080]
+fps: avg=73.2  worst frame=35.3 ms  (180 frames)   [1920x1080]

@@ -177,6 +177,13 @@ namespace Backrooms.EditorTools
             n += Add(root, traffic, "Traffic_RoomB", new Vector3(6.00f, 0f, 11.60f),
                      new Vector3(90f, 0f, 0f), new Vector2(1.30f, 4.60f));
 
+            // --- 掃除機の筋。通行の少ない隅にだけ、最後に清掃された向きが残る ---
+            var vac = M("M_Decal_Vacuum");
+            n += Add(root, vac, "Vacuum_NE", new Vector3(10.20f, 0f, 6.60f),
+                     new Vector3(90f, 0f, 0f), new Vector2(3.20f, 3.00f));
+            n += Add(root, vac, "Vacuum_SW", new Vector3(2.40f, 0f, 7.20f),
+                     new Vector3(90f, 90f, 0f), new Vector2(3.00f, 2.80f));
+
             // --- 家具の脚が長く乗っていた跡。4 点で 1 組の机 ---
             foreach (var (dx, dz) in new[] { (0f, 0f), (1.40f, 0f), (0f, 0.70f), (1.40f, 0.70f) })
                 n += Add(root, dent, "Dent", new Vector3(1.90f + dx, 0f, 1.80f + dz),
@@ -221,7 +228,9 @@ namespace Backrooms.EditorTools
             // クランプするだけなので、フィードバックループに食われない素の
             // オフセットとして効く。壁の実測 Y=0.077 に対し参照は約 0.54
             // (2.8 段上) だが、行き過ぎを避けてまず +1.5 段。
-            Set(exp, "compensation", 1.5f);
+            // 壁は Y=0.164 で参照の 0.54 に対しまだ 1.72 段下。ACES が圧縮する分
+            // 入力側は 1.72 段以上要るが、行き過ぎを避けて +1.5 段だけ足す。
+            Set(exp, "compensation", 3.0f);   // 旧 1.5
             Set(exp, "limitMin", -1.0f);
             Set(exp, "limitMax", 13.5f);
             Set(exp, "adaptationSpeedDarkToLight", 2.0f);
