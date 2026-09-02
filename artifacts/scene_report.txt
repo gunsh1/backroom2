@@ -1,0 +1,63 @@
+=== SceneBuilder (photoreal) 2026/09/02 7:42:40 ===
+geometry: 26056 verts / 11976 tris / 26 troffers
+lights: 23 area lights (4 casting shadows)
+  set  VisualEnvironment.skyType = 0
+  set  Exposure.mode = AutomaticHistogram
+  set  Exposure.meteringMode = CenterWeighted
+  set  Exposure.compensation = 1.5
+  set  Exposure.limitMin = -1
+  set  Exposure.limitMax = 13.5
+  set  Exposure.adaptationSpeedDarkToLight = 2
+  set  Exposure.adaptationSpeedLightToDark = 0.9
+  set  GlobalIllumination.quality = Custom
+  set  GlobalIllumination.enable = True
+  set  GlobalIllumination.tracing = RayTracing
+  set  GlobalIllumination.mode = Performance
+  set  GlobalIllumination.m_FullResolution = True
+  set  GlobalIllumination.m_RayLength = 20
+  set  GlobalIllumination.m_ClampValue = 2
+  set  GlobalIllumination.m_Denoise = True
+  set  GlobalIllumination.m_HalfResolutionDenoiser = False
+  set  GlobalIllumination.m_DenoiserRadius = 0.45
+  set  GlobalIllumination.bounceCount = 2
+  set  GlobalIllumination.m_MaxMixedRaySteps = 64
+  set  ScreenSpaceReflection.quality = Custom
+  set  ScreenSpaceReflection.enabled = True
+  set  ScreenSpaceReflection.tracing = RayTracing
+  set  ScreenSpaceReflection.mode = Performance
+  set  ScreenSpaceReflection.m_FullResolution = True
+  set  ScreenSpaceReflection.m_RayLength = 16
+  set  ScreenSpaceReflection.m_MinSmoothness = 0.2
+  set  ScreenSpaceReflection.m_SmoothnessFadeStart = 0.3
+  set  ScreenSpaceReflection.m_Denoise = True
+  set  RayTracingSettings.rayBias = 0.002
+  set  RayTracingSettings.extendShadowCulling = True
+  set  RayTracingSettings.extendCameraCulling = True
+  set  Fog.enabled = True
+  set  Fog.meanFreePath = 95
+  set  Fog.baseHeight = 0
+  set  Fog.maximumHeight = 40
+  set  Fog.enableVolumetricFog = True
+  set  Fog.anisotropy = 0.15
+  set  Fog.depthExtent = 45
+  set  Fog.albedo = RGBA(0.900, 0.890, 0.860, 1.000)
+  set  Tonemapping.mode = ACES
+  set  ColorAdjustments.postExposure = 0
+  set  ColorAdjustments.contrast = 0
+  set  ColorAdjustments.saturation = 0
+  set  Bloom.intensity = 0.13
+  set  Bloom.scatter = 0.62
+  set  ChromaticAberration.intensity = 0.055
+  set  Vignette.intensity = 0.13
+  set  Vignette.smoothness = 0.55
+  set  MotionBlur.intensity = 0.22
+  set  ScreenSpaceAmbientOcclusion.intensity = 0.75
+  set  ScreenSpaceAmbientOcclusion.radius = 0.45
+  set  ScreenSpaceAmbientOcclusion.rayTracing = True
+  set  HDShadowSettings.maxShadowDistance = 45
+volume profile: Assets/_Project/Settings/Level0_Volume.asset
+camera: TAA High, 47deg vFOV, black background
+camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on
+player rig built at (1.60, 0.00, 1.60)
+saved: Assets/_Project/Scenes/Level0.unity
+RESULT: OK

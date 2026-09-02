@@ -1,0 +1,56 @@
+# ==========================================================
+#  Unity プロジェクトの本体は BackroomsRT/ 側だけ
+# ==========================================================
+BackroomsRT/[Ll]ibrary/
+BackroomsRT/[Tt]emp/
+BackroomsRT/[Oo]bj/
+BackroomsRT/[Bb]uild/
+BackroomsRT/[Bb]uilds/
+BackroomsRT/[Ll]ogs/
+BackroomsRT/[Uu]ser[Ss]ettings/
+BackroomsRT/[Mm]emoryCaptures/
+BackroomsRT/[Rr]ecordings/
+BackroomsRT/.vsconfig
+
+# Unity と IDE が生成するもの
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.unitypackage
+.vs/
+.idea/
+sysinfo.txt
+
+# ==========================================================
+#  リポジトリ直下に誤って作られた空の Unity プロジェクトの残骸
+#  （Unity Hub で BackroomsRT ではなく backroom2 を開くとこうなる）
+# ==========================================================
+/Assets/
+/Library/
+/Logs/
+/Packages/
+/ProjectSettings/
+/Temp/
+/UserSettings/
+
+# ==========================================================
+#  作業成果物
+#  shots/ と *_report.txt は履歴に残す。
+#  ログ・API レスポンス・素材の元 zip は再取得できるので残さない。
+# ==========================================================
+artifacts/dl/
+artifacts/previews/
+artifacts/*.log
+artifacts/*.json
+artifacts/sheet_*.png
+artifacts/hdrp_asset_properties.txt

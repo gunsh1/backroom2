@@ -1,0 +1,26 @@
+* text=auto
+
+*.cs     text diff=csharp
+*.shader text
+*.hlsl   text
+*.ps1    text
+*.md     text
+
+# Unity の YAML アセット
+*.unity  text eol=lf merge=unityyamlmerge
+*.asset  text eol=lf merge=unityyamlmerge
+*.prefab text eol=lf merge=unityyamlmerge
+*.mat    text eol=lf merge=unityyamlmerge
+*.meta   text eol=lf merge=unityyamlmerge
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.tga  binary
+*.psd  binary
+*.exr  binary
+*.hdr  binary
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.fbx  binary

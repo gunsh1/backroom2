@@ -1,0 +1,13 @@
+Unity で開くのは、このフォルダではなく
+
+    BackroomsRT
+
+です。
+
+このフォルダ (backroom2) には Assets が無いため、ここを Unity で開くと
+Unity が「新しいプロジェクトを作れ」と解釈して、空のプロジェクトを
+この場所に作ってしまいます。
+
+正しい開き方:
+    PowerShell で   .\tools\backrooms.ps1 open
+    または Unity Hub の Add から backroom2\BackroomsRT を指定

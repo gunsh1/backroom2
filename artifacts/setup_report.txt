@@ -1,0 +1,87 @@
+=== Backrooms setup : 2026/09/01 22:28:59 ===
+Unity        : 6000.5.8f1
+supportsRT   : False   (batchmode では false になる)
+graphicsAPI  : Null
+
+--- PlayerSettings ---
+graphics APIs -> Direct3D12 only
+  staticBatching set via reflection
+colorSpace=Linear, 1920x1080, staticBatching=off
+
+--- RenderPipeline assets ---
+found: Assets/Settings/HDRP Balanced.asset   (HDRenderPipelineAsset)
+found: Assets/Settings/HDRP High Fidelity.asset   (HDRenderPipelineAsset)
+found: Assets/Settings/HDRP Performant.asset   (HDRenderPipelineAsset)
+found: Assets/Settings/HDRPDefaultResources/HDRenderPipelineAsset.asset   (HDRenderPipelineAsset)
+
+configuring: Assets/Settings/HDRP Balanced.asset
+  dumped 749 properties -> artifacts/hdrp_asset_properties.txt
+  SET  m_RenderPipelineSettings.supportRayTracing = True
+  SET  m_RenderPipelineSettings.supportedLitShaderMode = 3
+  SET  m_RenderPipelineSettings.supportSSR = True
+  SET  m_RenderPipelineSettings.supportSSRTransparent = True
+  SET  m_RenderPipelineSettings.supportSSGI = True
+  SET  m_RenderPipelineSettings.supportSSAO = True
+  SET  m_RenderPipelineSettings.hdShadowInitParams.supportScreenSpaceShadows = True
+  SET  m_RenderPipelineSettings.hdShadowInitParams.maxScreenSpaceShadowSlots = 4
+  MISS supportAreaLights
+  SET  m_RenderPipelineSettings.supportDecals = True
+  SET  m_RenderPipelineSettings.supportDecalLayers = True
+  SET  m_RenderPipelineSettings.supportVolumetrics = True
+  SET  m_RenderPipelineSettings.supportMotionVectors = True
+  SET  m_RenderPipelineSettings.supportDistortion = True
+  SET  m_RenderPipelineSettings.supportTransparentBackface = True
+
+configuring: Assets/Settings/HDRP High Fidelity.asset
+  SET  m_RenderPipelineSettings.supportRayTracing = True
+  SET  m_RenderPipelineSettings.supportedLitShaderMode = 3
+  SET  m_RenderPipelineSettings.supportSSR = True
+  SET  m_RenderPipelineSettings.supportSSRTransparent = True
+  SET  m_RenderPipelineSettings.supportSSGI = True
+  SET  m_RenderPipelineSettings.supportSSAO = True
+  SET  m_RenderPipelineSettings.hdShadowInitParams.supportScreenSpaceShadows = True
+  SET  m_RenderPipelineSettings.hdShadowInitParams.maxScreenSpaceShadowSlots = 4
+  MISS supportAreaLights
+  SET  m_RenderPipelineSettings.supportDecals = True
+  SET  m_RenderPipelineSettings.supportDecalLayers = True
+  SET  m_RenderPipelineSettings.supportVolumetrics = True
+  SET  m_RenderPipelineSettings.supportMotionVectors = True
+  SET  m_RenderPipelineSettings.supportDistortion = True
+  SET  m_RenderPipelineSettings.supportTransparentBackface = True
+
+configuring: Assets/Settings/HDRP Performant.asset
+  SET  m_RenderPipelineSettings.supportRayTracing = True
+  SET  m_RenderPipelineSettings.supportedLitShaderMode = 3
+  SET  m_RenderPipelineSettings.supportSSR = True
+  SET  m_RenderPipelineSettings.supportSSRTransparent = True
+  SET  m_RenderPipelineSettings.supportSSGI = True
+  SET  m_RenderPipelineSettings.supportSSAO = True
+  SET  m_RenderPipelineSettings.hdShadowInitParams.supportScreenSpaceShadows = True
+  SET  m_RenderPipelineSettings.hdShadowInitParams.maxScreenSpaceShadowSlots = 4
+  MISS supportAreaLights
+  SET  m_RenderPipelineSettings.supportDecals = True
+  SET  m_RenderPipelineSettings.supportDecalLayers = True
+  SET  m_RenderPipelineSettings.supportVolumetrics = True
+  SET  m_RenderPipelineSettings.supportMotionVectors = True
+  SET  m_RenderPipelineSettings.supportDistortion = True
+  SET  m_RenderPipelineSettings.supportTransparentBackface = True
+
+configuring: Assets/Settings/HDRPDefaultResources/HDRenderPipelineAsset.asset
+  SET  m_RenderPipelineSettings.supportRayTracing = True
+  SET  m_RenderPipelineSettings.supportedLitShaderMode = 3
+  SET  m_RenderPipelineSettings.supportSSR = True
+  SET  m_RenderPipelineSettings.supportSSRTransparent = True
+  SET  m_RenderPipelineSettings.supportSSGI = True
+  SET  m_RenderPipelineSettings.supportSSAO = True
+  SET  m_RenderPipelineSettings.hdShadowInitParams.supportScreenSpaceShadows = True
+  SET  m_RenderPipelineSettings.hdShadowInitParams.maxScreenSpaceShadowSlots = 4
+  MISS supportAreaLights
+  SET  m_RenderPipelineSettings.supportDecals = True
+  SET  m_RenderPipelineSettings.supportDecalLayers = True
+  SET  m_RenderPipelineSettings.supportVolumetrics = True
+  SET  m_RenderPipelineSettings.supportMotionVectors = True
+  SET  m_RenderPipelineSettings.supportDistortion = True
+  SET  m_RenderPipelineSettings.supportTransparentBackface = True
+
+defaultRenderPipeline -> Assets/Settings/HDRP High Fidelity.asset   (quality levels: 3)
+RESULT: OK
