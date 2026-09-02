@@ -299,6 +299,17 @@ namespace Backrooms.Generation
         }
 
         // -------------------------------------------------------------- 出力
+        /// <summary>
+        /// 全頂点に、頂点位置だけで決まる変位を加える。
+        /// 変位を「位置の関数」にすることで、稜線で重なっている頂点が
+        /// 必ず同じだけ動き、面が割れない。
+        /// 実在の壁は数 mm 反っており、完全な平面は CG の証拠になる。
+        /// </summary>
+        public void Warp(System.Func<Vector3, Vector3> f)
+        {
+            for (int i = 0; i < _v.Count; i++) _v[i] += f(_v[i]);
+        }
+
         public Mesh ToMesh(string name)
         {
             var m = new Mesh { name = name };

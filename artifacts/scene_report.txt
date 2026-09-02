@@ -1,6 +1,7 @@
-=== SceneBuilder (photoreal) 2026/09/02 21:00:32 ===
-geometry: 27464 verts / 12620 tris / 26 troffers
+=== SceneBuilder (photoreal) 2026/09/02 21:25:21 ===
+geometry: 28328 verts / 13016 tris / 26 troffers
 lights: 23 area lights (4 casting shadows)
+decals: 14 projectors
   set  VisualEnvironment.skyType = 0
   set  Exposure.mode = AutomaticHistogram
   set  Exposure.meteringMode = CenterWeighted

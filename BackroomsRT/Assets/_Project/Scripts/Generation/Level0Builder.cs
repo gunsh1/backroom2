@@ -16,6 +16,7 @@ namespace Backrooms.Generation
         public Material DiffuserOff;
         public Material Chrome;    // スプリンクラー
         public Material Plastic;   // 感知器・コンセント
+        public Material DoorFrame; // 開口の三方枠
     }
 
     /// <summary>
@@ -109,6 +110,9 @@ namespace Backrooms.Generation
             // 迷路感を出す袖壁と柱
             wall.BeveledBox(new Vector3(7.50f, 0, roomA.Z0), new Vector3(7.65f, roomA.H + WallOverrun, 3.60f), BevelWall, UvWall);
             wall.BeveledBox(new Vector3(3.40f, 0, 5.20f), new Vector3(3.80f, roomA.H + WallOverrun, 5.60f), BevelWall, UvWall);
+            // 実在の建物の壁は完全な平面ではない。長手方向に数 mm 反っており、
+            // 長い壁の稜線が定規のように真っ直ぐなのは強い CG の証拠になる。
+            wall.Warp(WallBow);
             MeshKit.Spawn(root.transform, "Walls", wall.ToMesh("Walls"), mats.Wallpaper);
 
             // -------------------------------------------------------- 幅木
@@ -118,6 +122,7 @@ namespace Backrooms.Generation
             // 袖壁と柱の足元
             AddBaseboardAround(bb, 7.50f, 7.65f, roomA.Z0, 3.60f);
             AddBaseboardAround(bb, 3.40f, 3.80f, 5.20f, 5.60f);
+            bb.Warp(WallBow);   // 壁と同じ関数で動かさないと幅木との間に隙間ができる
             MeshKit.Spawn(root.transform, "Baseboards", bb.ToMesh("Baseboards"), mats.Baseboard);
 
             // -------------------------------------------------------- 天井
@@ -157,13 +162,30 @@ namespace Backrooms.Generation
             // 設備が「建物として要る物」なのに対し、こちらは「人が触った物」で、
             // 無いと空間が『誰も居ない』ではなく『誰も居たことがない』に見える。
             BuildTraces(roomA, plastic, vents);
+            // 開口の三方枠。壁に穴が開いて壁厚が見えているだけの開口は
+            // 実在の建物には存在しない。プレス鋼板の枠が必ず入る。
+            var frameMesh = new MeshBuilder();
+            BuildOpeningFrame(frameMesh, openX0, openX1, openH, roomA.Z1);
             if (!chrome.IsEmpty)
                 MeshKit.Spawn(root.transform, "Sprinklers", chrome.ToMesh("Sprinklers"), mats.Chrome);
             if (!plastic.IsEmpty)
+            {
+                plastic.Warp(WallBow);   // 壁付けの物は壁と一緒に動く
                 MeshKit.Spawn(root.transform, "Fittings", plastic.ToMesh("Fittings"), mats.Plastic);
+            }
             if (!vents.IsEmpty)
                 MeshKit.Spawn(root.transform, "AirDiffusers", vents.ToMesh("AirDiffusers"), mats.Metal);
+            if (!frameMesh.IsEmpty)
+            {
+                frameMesh.Warp(WallBow);   // 枠も壁と一緒に反る
+                MeshKit.Spawn(root.transform, "OpeningFrame", frameMesh.ToMesh("OpeningFrame"),
+                              mats.DoorFrame != null ? mats.DoorFrame : mats.Metal);
+            }
 
+            // 吊り天井は吊りボルトの間で必ず垂れる。グリッドが完全な水平面なのも
+            // 現実にはあり得ない。タイルとバーは同じ関数で動かす。
+            tiles.Warp(CeilingSag);
+            bars.Warp(CeilingSag);
             MeshKit.Spawn(root.transform, "CeilingTiles", tiles.ToMesh("CeilingTiles"), mats.CeilingTile);
             MeshKit.Spawn(root.transform, "CeilingGrid", bars.ToMesh("CeilingGrid"), mats.Metal);
             MeshKit.Spawn(root.transform, "TrofferFrames", frames.ToMesh("TrofferFrames"), mats.Metal);
@@ -178,6 +200,57 @@ namespace Backrooms.Generation
                 res.Tris += mf.sharedMesh.triangles.Length / 3;
             }
             return res;
+        }
+
+        // ------------------------------------------------------ 幾何の不完全さ
+
+        /// <summary>壁の反り。波長 5m 前後で最大 4mm、中間高さで最も反る。</summary>
+        static Vector3 WallBow(Vector3 p)
+        {
+            float h = Mathf.Sin(Mathf.Clamp01(p.y / 2.70f) * Mathf.PI);
+            float dx = Mathf.Sin(p.z * 1.27f + 0.6f) * 0.004f * h;
+            float dz = Mathf.Sin(p.x * 1.13f + 2.1f) * 0.004f * h;
+            return new Vector3(dx, 0f, dz);
+        }
+
+        /// <summary>吊りボルト間の垂れ。2.4m 周期で最大 2.2mm 下がる。</summary>
+        static Vector3 CeilingSag(Vector3 p)
+        {
+            const float K = 2f * Mathf.PI / 2.4f;
+            float s = (1f - Mathf.Cos(p.x * K)) * 0.5f * (1f - Mathf.Cos(p.z * K)) * 0.5f;
+            return new Vector3(0f, -0.0022f * s, 0f);
+        }
+
+        // -------------------------------------------------------------- 開口枠
+
+        /// <summary>
+        /// プレス鋼板の三方枠。見込みを板で覆い、両面に見付を返す。
+        /// これが無いと開口が「壁を切り抜いた穴」に見え、
+        /// 見込み面が素の壁材のまま暗く落ちる。
+        /// </summary>
+        static void BuildOpeningFrame(MeshBuilder m, float x0, float x1, float h, float z)
+        {
+            const float Lin = 0.016f;   // 見込みを覆う板厚
+            const float Face = 0.062f;  // 見付の出幅
+            const float Proud = 0.014f; // 壁面からの出
+            float za = z, zb = z + WallT;
+
+            // 縦枠（見込みの板）
+            m.BeveledBox(new Vector3(x0, 0f, za), new Vector3(x0 + Lin, h, zb), 0.0015f, 1f);
+            m.BeveledBox(new Vector3(x1 - Lin, 0f, za), new Vector3(x1, h, zb), 0.0015f, 1f);
+            // 上枠
+            m.BeveledBox(new Vector3(x0, h - Lin, za), new Vector3(x1, h, zb), 0.0015f, 1f);
+
+            // 見付（両面への返し）
+            foreach (var (fz0, fz1) in new[] { (za - Proud, za), (zb, zb + Proud) })
+            {
+                m.BeveledBox(new Vector3(x0 - Face, 0f, fz0),
+                             new Vector3(x0 + Lin, h + Face, fz1), 0.0015f, 1f);
+                m.BeveledBox(new Vector3(x1 - Lin, 0f, fz0),
+                             new Vector3(x1 + Face, h + Face, fz1), 0.0015f, 1f);
+                m.BeveledBox(new Vector3(x0 - Face, h - Lin, fz0),
+                             new Vector3(x1 + Face, h + Face, fz1), 0.0015f, 1f);
+            }
         }
 
         // ------------------------------------------------------------ 設備生成

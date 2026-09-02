@@ -37,6 +37,7 @@ namespace Backrooms.EditorTools
             Log.Add($"geometry: {geo.Verts} verts / {geo.Tris} tris / {geo.TrofferCenters.Count} troffers");
 
             BuildLights(geo);
+            BuildDecals();
             BuildVolume();
             BuildPlayer();
 
@@ -70,6 +71,7 @@ namespace Backrooms.EditorTools
                 DiffuserOff = M("M_DiffuserOff"),
                 Chrome = M("M_Chrome"),
                 Plastic = M("M_Plastic"),
+                DoorFrame = M("M_DoorFrame"),
             };
         }
 
@@ -126,6 +128,78 @@ namespace Backrooms.EditorTools
                 made++;
             }
             Log.Add($"lights: {made} area lights ({shadowed} casting shadows)");
+        }
+
+        // ------------------------------------------------------------ decals
+
+        /// <summary>
+        /// 原因が「その場所」に紐づく汚れを置く。
+        /// 壁紙は 2.12m ごとにタイリングするので、手擦れや水の垂れのような
+        /// 一点物をテクスチャに焼くと必ず等間隔で並んで見える。
+        /// </summary>
+        static void BuildDecals()
+        {
+            var root = new GameObject("Decals");
+            Material M(string n) => AssetDatabase.LoadAssetAtPath<Material>(MatRoot + "/" + n + ".mat");
+            var scuff = M("M_Decal_Scuff");
+            var drip = M("M_Decal_Drip");
+            var traffic = M("M_Decal_Traffic");
+            var dent = M("M_Decal_Dent");
+            int n = 0;
+
+            // --- 外角の手擦れ。人が角を曲がるときに手と肩が当たる高さ ---
+            // 柱 (3.40-3.80, 5.20-5.60) の、通路側を向いた 2 面
+            n += Add(root, scuff, "Scuff_Col_A", new Vector3(3.40f, 1.05f, 5.34f),
+                     new Vector3(0f, -90f, 0f), new Vector2(0.42f, 0.95f));
+            n += Add(root, scuff, "Scuff_Col_B", new Vector3(3.66f, 1.05f, 5.20f),
+                     new Vector3(0f, 180f, 0f), new Vector2(0.42f, 0.95f));
+            // 袖壁 (7.50-7.65, z 0-3.60) の先端
+            n += Add(root, scuff, "Scuff_Fin", new Vector3(7.50f, 1.05f, 3.42f),
+                     new Vector3(0f, -90f, 0f), new Vector2(0.40f, 0.95f));
+            // 開口の枠脇。ここは最も触られる
+            n += Add(root, scuff, "Scuff_Door", new Vector3(6.95f, 1.05f, 9.00f),
+                     new Vector3(0f, 180f, 0f), new Vector2(0.34f, 1.00f));
+
+            // --- 天井から垂れた水の筋。天井際から下に向かって落ちる ---
+            n += Add(root, drip, "Drip_East", new Vector3(12.00f, 1.95f, 3.10f),
+                     new Vector3(0f, -90f, 0f), new Vector2(1.10f, 1.55f));
+            n += Add(root, drip, "Drip_North", new Vector3(9.40f, 1.95f, 9.00f),
+                     new Vector3(0f, 180f, 0f), new Vector2(0.95f, 1.50f));
+            n += Add(root, drip, "Drip_RoomB", new Vector3(3.00f, 1.80f, 12.40f),
+                     new Vector3(0f, 90f, 0f), new Vector2(0.90f, 1.35f));
+
+            // --- カーペットの通行帯。毛足が踏み倒されて沈み、わずかに艶が出る ---
+            // 床は真下に投影する。回転 (90,yaw,0) で local +Z が下を向く。
+            n += Add(root, traffic, "Traffic_ToDoor", new Vector3(6.00f, 0f, 5.20f),
+                     new Vector3(90f, 0f, 0f), new Vector2(1.45f, 7.20f));
+            n += Add(root, traffic, "Traffic_Cross", new Vector3(5.40f, 0f, 4.40f),
+                     new Vector3(90f, 90f, 0f), new Vector2(1.30f, 8.80f));
+            n += Add(root, traffic, "Traffic_RoomB", new Vector3(6.00f, 0f, 11.60f),
+                     new Vector3(90f, 0f, 0f), new Vector2(1.30f, 4.60f));
+
+            // --- 家具の脚が長く乗っていた跡。4 点で 1 組の机 ---
+            foreach (var (dx, dz) in new[] { (0f, 0f), (1.40f, 0f), (0f, 0.70f), (1.40f, 0.70f) })
+                n += Add(root, dent, "Dent", new Vector3(1.90f + dx, 0f, 1.80f + dz),
+                         new Vector3(90f, 0f, 0f), new Vector2(0.11f, 0.11f));
+
+            Log.Add($"decals: {n} projectors");
+        }
+
+        static int Add(GameObject root, Material mat, string name,
+                       Vector3 pos, Vector3 euler, Vector2 size, float depth = 0.45f)
+        {
+            if (mat == null) { Log.Add("  decal material missing for " + name); return 0; }
+            var go = new GameObject(name);
+            go.transform.SetParent(root.transform, false);
+            go.transform.position = pos;
+            go.transform.rotation = Quaternion.Euler(euler);
+            var dp = go.AddComponent<DecalProjector>();
+            dp.material = mat;
+            dp.size = new Vector3(size.x, size.y, depth);
+            dp.pivot = Vector3.zero;
+            dp.drawDistance = 45f;
+            dp.fadeFactor = 1f;
+            return 1;
         }
 
         // ------------------------------------------------------------ volume
@@ -321,6 +395,7 @@ namespace Backrooms.EditorTools
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.Volumetrics, true);
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.ScreenSpaceShadows, true);
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.ContactShadows, true);
+                camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.Decals, true);
 
                 var mask = camData.renderingPathCustomFrameSettingsOverrideMask;
                 mask.mask[(uint)FrameSettingsField.RayTracing] = true;
@@ -329,6 +404,7 @@ namespace Backrooms.EditorTools
                 mask.mask[(uint)FrameSettingsField.Volumetrics] = true;
                 mask.mask[(uint)FrameSettingsField.ScreenSpaceShadows] = true;
                 mask.mask[(uint)FrameSettingsField.ContactShadows] = true;
+                mask.mask[(uint)FrameSettingsField.Decals] = true;
                 camData.renderingPathCustomFrameSettingsOverrideMask = mask;
                 Log.Add("camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on");
             }

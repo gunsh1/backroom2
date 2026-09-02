@@ -31,10 +31,17 @@ namespace Backrooms.EditorTools
                 ti.textureType = TextureImporterType.NormalMap;
                 ti.sRGBTexture = false;
             }
-            else if (f.Contains("_Color"))
+            else if (f.Contains("_Color") || f.StartsWith("Decal_"))
             {
                 ti.textureType = TextureImporterType.Default;
                 ti.sRGBTexture = true;
+                // デカールは α を被覆率として使う。ここを落とすと
+                // 投影ボックスの矩形がそのまま画面に出る。
+                if (f.StartsWith("Decal_"))
+                {
+                    ti.alphaSource = TextureImporterAlphaSource.FromInput;
+                    ti.alphaIsTransparency = true;
+                }
             }
             else
             {
