@@ -110,9 +110,10 @@ namespace Backrooms.EditorTools
                 // 正体で、黒体の 4200K からは絶対に出ない。
                 // HDRP は color.linear x CCT(T) を掛けるので、色温度を使うと
                 // 必ず黒体の軌跡上に乗ってしまう。ここは色温度を切って直接指定する。
-                // 実効リニア = (0.946, 1.000, 0.778)。R/G = 0.95、B/R = 0.82。
+                // 参照の実測から逆算: 実効リニア (1.000, 0.943, 0.500)。
+                // R/G = 1.06、B/R = 0.50。暖白色の蛍光管に相当する。
                 light.useColorTemperature = false;
-                light.color = new Color(0.976f, 1.0f, 0.895f);
+                light.color = new Color(1.0f, 0.974f, 0.735f);
 
                 bool wantShadow = shadowed < 4 && p.z < 8f;
                 light.shadows = wantShadow ? LightShadows.Soft : LightShadows.None;
@@ -234,10 +235,10 @@ namespace Backrooms.EditorTools
             // (2.8 段上) だが、行き過ぎを避けてまず +1.5 段。
             // 壁は Y=0.164 で参照の 0.54 に対しまだ 1.72 段下。ACES が圧縮する分
             // 入力側は 1.72 段以上要るが、行き過ぎを避けて +1.5 段だけ足す。
-            // 参照の壁は sRGB (0.85, 0.83, 0.56) = リニア Y 0.638。
-            // (これまで 0.54 としていたのは私の計算違い。)
-            // 現状 0.568 なのであと 0.17 段。
-            Set(exp, "compensation", 3.2f);   // 旧 1.5 -> 3.0 -> 3.2
+            // 参照画像を実測したところ、目測は逆方向に大きく外れていた。
+            // 参照の中央値 Y は 0.240、白飛び 0.00%。こちらは 0.468 で
+            // 白飛び 2.58% だったので、1 段落とす。
+            Set(exp, "compensation", 1.98f);  // 1.85 では中央値 0.188 (参照 0.240) と下げすぎた
             Set(exp, "limitMin", -1.0f);
             Set(exp, "limitMax", 13.5f);
             Set(exp, "adaptationSpeedDarkToLight", 2.0f);
@@ -250,13 +251,19 @@ namespace Backrooms.EditorTools
             UseCustomQuality(gi);
             Set(gi, "enable", true);
             Set(gi, "tracing", (int)RayCastingMode.RayTracing);
+            // bounceCount は QualityRTGI の中でしか読まれず、Performance では
+            // 一度も参照されない。ただし Quality に切り替えても天井タイルは
+            // 0.020 -> 0.015 で改善せず、fps だけ 72 -> 18 に落ちた。
+            // 天井が暗いのは GI ではなく参照側の黒の持ち上げが原因だったので、
+            // 2 倍のコストに見合わない Performance に戻す。
             Set(gi, "mode", (int)RayTracingMode.Performance);
-            Set(gi, "fullResolution", true);          // 旧: false
-            Set(gi, "rayLength", 20f);                // 旧: 15
-            // 8.0 まで緩めても天井は 0.0545 -> 0.0524 で変化しなかった。
-            // 天井が暗いのはクランプではなく器具の粗さが原因だったため、
-            // ファイアフライ抑制に有利な 2.0 に戻す。
-            Set(gi, "clampValue", 2.0f);
+            Set(gi, "fullResolution", true);
+            Set(gi, "rayLength", 14f);   // 12x9m の室内に 20m は過剰
+            // 以前 8.0 を試して変化しなかったが、あれは室内全体が 5 段暗く、
+            // クランプに掛かるサンプルがそもそも無い状態での試験だった。
+            // 露出 +2.2 EV の今、器具直下の床は直接光で十分明るく、
+            // 天井が受け取るべきサンプルがここで切られている可能性が高い。
+            Set(gi, "clampValue", 12.0f);
             Set(gi, "denoise", true);
             Set(gi, "halfResolutionDenoiser", false); // 旧: true（間接光の滲みが減る）
             Set(gi, "denoiserRadius", 0.45f);
@@ -269,11 +276,20 @@ namespace Backrooms.EditorTools
             Set(ssr, "enabled", true);
             Set(ssr, "tracing", (int)RayCastingMode.RayTracing);
             Set(ssr, "mode", (int)RayTracingMode.Performance);
-            Set(ssr, "fullResolution", true);
+            // Quality RTGI が重いので、反射は半解像度に落として予算を回す。
+            Set(ssr, "fullResolution", false);
             Set(ssr, "rayLength", 16f);
             Set(ssr, "minSmoothness", 0.20f);         // 旧: 0.30（粗い面にも反射を出す）
             Set(ssr, "smoothnessFadeStart", 0.30f);
             Set(ssr, "denoise", true);
+
+            // --- 間接光の総量 ---------------------------------------------
+            // 天井タイルは下向き面で 100% 間接光。参照では壁の 40% の明るさが
+            // あるのに、こちらは 6% しか出ない。RTGI が下向き面に運ぶ量が
+            // 実測で 5-6 倍足りない (clamp も Quality モードも効果なしを確認済み)。
+            // 直接光を受ける壁・床への影響は小さく、天井だけが選択的に上がる。
+            var ilc = AddOverride<IndirectLightingController>(profile);
+            Set(ilc, "indirectDiffuseLightingMultiplier", 1.8f);   // 2.6 は壁まで上げすぎた
 
             var rts = AddOverride<RayTracingSettings>(profile);
             Set(rts, "rayBias", 0.002f);
@@ -300,6 +316,12 @@ namespace Backrooms.EditorTools
 
             // ホワイトバランスは触らない。4200K の蛍光灯の下で
             // デイライトに合わせたカメラが見る色を、そのまま出す。
+            // 中性の持ち上げは撤回した。参照の暗部は sRGB (0.271, 0.197, 0.044)、
+            // B/R = 0.057 の濃いオレンジで、黒が持ち上がっているのではなく
+            // 部屋のどこにも青が存在しないだけ。中性の lift を足すと
+            // 平均彩度が 0.702 -> 0.304 まで壊れた (参照は 0.674)。
+            // 正しい処置は全ての材質の彩度を参照に合わせること。
+
             var ca = AddOverride<ColorAdjustments>(profile);
             Set(ca, "postExposure", 0f);
             Set(ca, "contrast", 0f);
@@ -527,6 +549,19 @@ namespace Backrooms.EditorTools
             valueProp.SetValue(p, 3);   // ScalableSettingLevelParameter は 3 が「カスタム」
             p.overrideState = true;
             Log.Add($"  set  {c.GetType().Name}.quality = Custom");
+        }
+
+        static void SetVec(VolumeComponent c, string field, Vector4 v)
+        {
+            var f = c?.GetType().GetField(field, Any);
+            if (f == null) { Log.Add($"  MISS {c?.GetType().Name}.{field}"); return; }
+            var p = f.GetValue(c) as VolumeParameter;
+            var valueProp = p?.GetType().GetProperty("value");
+            if (valueProp == null || valueProp.PropertyType != typeof(Vector4))
+            { Log.Add("  MISS vec4 " + field); return; }
+            valueProp.SetValue(p, v);
+            p.overrideState = true;
+            Log.Add($"  set  {c.GetType().Name}.{field} = {v}");
         }
 
         static void SetColor(VolumeComponent c, string field, Color color)

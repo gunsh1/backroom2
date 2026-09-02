@@ -34,7 +34,7 @@ namespace Backrooms.EditorTools
             SetTex(wall, "_BaseColorMap", Tex("Wallpaper001B/Wallpaper_Grimed_Color.png"));
             SetTex(wall, "_NormalMap", Tex("Wallpaper001B/Wallpaper001B_NormalGL_Seamed.png"));
             SetTex(wall, "_MaskMap", Tex("Wallpaper001B/Wallpaper_Grimed_MaskMap.png"));
-            SetCol(wall, "_BaseColor", Srgb(0.881f, 0.840f, 0.640f));
+            SetCol(wall, "_BaseColor", Srgb(0.881f, 0.840f, 0.600f));
             // 青を 3 回上げたのは、暖色の黒体光源が青を食っていた分の埋め合わせ
             // だった。光源を蛍光灯の実測色にした今、それが二重に効いて壁が
             // 白くなった。参照から逆算して戻す:
@@ -69,7 +69,10 @@ namespace Backrooms.EditorTools
             SetTex(carpet, "_NormalMap", Tex("Carpet011/Carpet011_NormalGL.jpg"));
             SetTex(carpet, "_MaskMap", Tex("Carpet011/Carpet011_MaskMap.png"));
             SetTex(carpet, "_HeightMap", Tex("Carpet011/Carpet011_Displacement.jpg"));
-            SetCol(carpet, "_BaseColor", Srgb(0.78f, 0.72f, 0.60f));
+            SetCol(carpet, "_BaseColor", Srgb(0.78f, 0.712f, 0.547f));
+            // 参照のカーペットは B/R 0.102 / R/G 1.461。Carpet011 の素の色が
+            // 既に linear (0.400, 0.344, 0.115) と十分黄色いので、ティントは
+            // ほぼ中性にして素材そのものに色を作らせる。
             // 参照では床は壁より暗い。こちらは器具の真下で受けるぶん
             // Y=0.639 と壁 (0.508) より明るくなっていた。
             // 輝度アルベド 0.247 -> 0.167 (業務用カーペットの実測 15-20% の範囲)。
@@ -98,15 +101,30 @@ namespace Backrooms.EditorTools
             SetTex(ceil, "_BaseColorMap", Tex("OfficeCeiling001/OfficeCeiling_Aged_Color.png"));
             SetTex(ceil, "_NormalMap", Tex("OfficeCeiling001/OfficeCeiling001_NormalGL.jpg"));
             SetTex(ceil, "_MaskMap", Tex("OfficeCeiling001/OfficeCeiling001_MaskMap.png"));
-            SetCol(ceil, "_BaseColor", Srgb(0.86f, 0.845f, 0.800f));    // わずかに黄ばんだ白
+            SetCol(ceil, "_BaseColor", Srgb(0.780f, 0.665f, 0.475f));  // 黄ばんだ吸音タイル
+            // Quality RTGI でバウンスが届くようになり Y=0.255 (参照 0.111) と
+            // 明るくなりすぎた。実測から逆算した実効アルベド (0.318, 0.200, 0.052)。
+            // 参照の天井タイルは B/R 0.116 / R/G 1.796 とかなり濃いタン。
+            // 参照の天井タイルは Y=0.111 と最も暗い面で、壁の 0.45 倍 (1.15 段下)。
+            // ほぼ白のタイルでは絶対にこの関係にならない。
+            // 逆算した実効アルベド (0.476, 0.360, 0.169)。
             SetF(ceil, "_NormalScale", 0.9f);
             Smoothness(ceil, 0.02f, 0.16f);                             // 吸音材はほぼ無反射
             SetF(ceil, "_AORemapMin", 0.45f);
+            // HDRP の RTGI は下向き面に運ぶ間接光が実測で 5-6 倍足りない。
+            // clamp、Quality モード、間接倍率のいずれでも埋まらず、
+            // 天井/壁比は参照の 0.404 に対し 0.15 が上限だった。
+            // 不足分を微弱な自発光で埋める。物理ではなく補填。
+            // 色は室内の光と同じにして、ここだけ色が浮かないようにする。
+            // 90 nits は強すぎて天井が 0.278 (参照 0.111)、しかも色がオレンジ過ぎて
+            // 室内全体の R/G を 1.68 (参照 1.323) まで押し上げた。
+            // 実測から 27 nits、色は光源と同じにして室内の色相を動かさない。
+            Emissive(ceil, Srgb(1.00f, 0.974f, 0.735f), nits: 10f);   // 27 でも天井 0.257 (参照 0.111)
             Save(ceil);
 
             // -------------------------------------------- T バー／トロファー枠
             var metal = Make("M_GridMetal");
-            SetCol(metal, "_BaseColor", Srgb(0.845f, 0.830f, 0.775f));  // 白塗装鋼板
+            SetCol(metal, "_BaseColor", Srgb(0.845f, 0.815f, 0.560f));  // 黄ばんだ白塗装鋼板
             // 実測では T バーはタイルの 0.45 段下で、これは実物どおり。
             // ただし素の反射率が linear 0.53 と低かったので、白塗装の 0.69 に寄せる。
             SetF(metal, "_Metallic", 0f);
@@ -115,7 +133,7 @@ namespace Backrooms.EditorTools
 
             // ---------------------------------------------------------- 幅木
             var baseb = Make("M_Baseboard");
-            SetCol(baseb, "_BaseColor", Srgb(0.80f, 0.755f, 0.640f));   // 淡いタンのビニル幅木
+            SetCol(baseb, "_BaseColor", Srgb(0.86f, 0.836f, 0.497f));   // 淡いタンのビニル幅木
             // 参照の幅木は壁とほとんど見分けがつかない淡いタン。
             // linear 0.342 -> 0.603 (+0.82 段)。残る差は床際の接地 AO なので
             // アルベドで詰められるのはここまで。
@@ -130,7 +148,9 @@ namespace Backrooms.EditorTools
             var on = Make("M_DiffuserOn");
             SetCol(on, "_BaseColor", Srgb(0.05f, 0.05f, 0.05f));
             SetF(on, "_Smoothness", 0.55f);
-            Emissive(on, Srgb(1.00f, 0.985f, 0.905f), nits: 1800f);     // 4200K 相当のわずかに緑寄り
+            Emissive(on, Srgb(1.00f, 0.974f, 0.735f), nits: 1150f);
+            // 参照の器具は Y=0.971 で白飛びしていない (白飛び率 0.00%)。
+            // 1800 nits では露出 +2.2 EV で 2.5% 飛んでいたので落とす。
             Save(on);
 
             // ------------------------------------------------------- 開口枠

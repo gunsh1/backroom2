@@ -1,11 +1,11 @@
-=== SceneBuilder (photoreal) 2026/09/02 22:01:00 ===
+=== SceneBuilder (photoreal) 2026/09/02 22:43:51 ===
 geometry: 28328 verts / 13016 tris / 26 troffers
 lights: 23 area lights (4 casting shadows)
 decals: 16 projectors
   set  VisualEnvironment.skyType = 0
   set  Exposure.mode = AutomaticHistogram
   set  Exposure.meteringMode = CenterWeighted
-  set  Exposure.compensation = 3.2
+  set  Exposure.compensation = 1.98
   set  Exposure.limitMin = -1
   set  Exposure.limitMax = 13.5
   set  Exposure.adaptationSpeedDarkToLight = 2
@@ -15,8 +15,8 @@ decals: 16 projectors
   set  GlobalIllumination.tracing = RayTracing
   set  GlobalIllumination.mode = Performance
   set  GlobalIllumination.m_FullResolution = True
-  set  GlobalIllumination.m_RayLength = 20
-  set  GlobalIllumination.m_ClampValue = 2
+  set  GlobalIllumination.m_RayLength = 14
+  set  GlobalIllumination.m_ClampValue = 12
   set  GlobalIllumination.m_Denoise = True
   set  GlobalIllumination.m_HalfResolutionDenoiser = False
   set  GlobalIllumination.m_DenoiserRadius = 0.45
@@ -26,11 +26,12 @@ decals: 16 projectors
   set  ScreenSpaceReflection.enabled = True
   set  ScreenSpaceReflection.tracing = RayTracing
   set  ScreenSpaceReflection.mode = Performance
-  set  ScreenSpaceReflection.m_FullResolution = True
+  set  ScreenSpaceReflection.m_FullResolution = False
   set  ScreenSpaceReflection.m_RayLength = 16
   set  ScreenSpaceReflection.m_MinSmoothness = 0.2
   set  ScreenSpaceReflection.m_SmoothnessFadeStart = 0.3
   set  ScreenSpaceReflection.m_Denoise = True
+  set  IndirectLightingController.indirectDiffuseLightingMultiplier = 1.8
   set  RayTracingSettings.rayBias = 0.002
   set  RayTracingSettings.extendShadowCulling = True
   set  RayTracingSettings.extendCameraCulling = True
