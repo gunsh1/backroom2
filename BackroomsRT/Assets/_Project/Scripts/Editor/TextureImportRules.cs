@@ -16,7 +16,11 @@ namespace Backrooms.EditorTools
             if (!assetPath.Replace('\\', '/').Contains(Root)) return;
             var ti = (TextureImporter)assetImporter;
 
-            ti.maxTextureSize = 2048;
+            // アトラスは 1 枚の中に 64 タイルが入っているので、
+            // 2048 に落とすと 1 タイルあたり 256px = 0.43 px/mm しか残らず、
+            // 亀裂も針穴も潰れる。アトラスだけ 4096 を許す。
+            ti.maxTextureSize = System.IO.Path.GetFileNameWithoutExtension(assetPath).Contains("Atlas")
+                                ? 4096 : 2048;
             ti.textureCompression = TextureImporterCompression.CompressedHQ;
             ti.wrapMode = TextureWrapMode.Repeat;
             ti.mipmapEnabled = true;

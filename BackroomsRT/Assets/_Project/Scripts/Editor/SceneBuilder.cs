@@ -7,6 +7,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
+using Backrooms.Capture;
 using Backrooms.Generation;
 using Backrooms.Player;
 
@@ -33,13 +34,13 @@ namespace Backrooms.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             var mats = LoadMaterials();
-            var geo = Level0Builder.BuildSandbox(mats);
-            Log.Add($"geometry: {geo.Verts} verts / {geo.Tris} tris / {geo.TrofferCenters.Count} troffers");
+            var geo = Level0Generator.Build(mats);
+            Log.AddRange(geo.Log);
 
             BuildLights(geo);
-            BuildDecals();
+            BuildDecals(geo);
             BuildVolume();
-            BuildPlayer();
+            BuildPlayer(geo);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -65,28 +66,41 @@ namespace Backrooms.EditorTools
                 Wallpaper = M("M_Wallpaper"),
                 Carpet = M("M_Carpet"),
                 CeilingTile = M("M_CeilingTile"),
+                CeilingTileDark = M("M_CeilingTileDark"),
                 Metal = M("M_GridMetal"),
+                MetalDark = M("M_GridMetalDark"),
                 Baseboard = M("M_Baseboard"),
                 DiffuserOn = M("M_DiffuserOn"),
                 DiffuserOff = M("M_DiffuserOff"),
                 Chrome = M("M_Chrome"),
                 Plastic = M("M_Plastic"),
                 DoorFrame = M("M_DoorFrame"),
+                Plenum = M("M_Plenum"),
             };
         }
 
         // ------------------------------------------------------------ lights
-        static void BuildLights(Level0Builder.Result geo)
+        static void BuildLights(Level0Generator.Result geo)
         {
             var root = new GameObject("Lights");
             int made = 0, shadowed = 0;
+
+            // 影を落とすのはスポーン付近の 4 灯だけ。エリアライトの影は
+            // 1 台ごとに専用のシャドウマップを要求するので、数を増やすと
+            // レイトレの予算を全て持っていく。
+            var order = new List<int>();
+            for (int i = 0; i < geo.TrofferCenters.Count; i++) if (geo.TrofferAlive[i]) order.Add(i);
+            order.Sort((x, y) => (geo.TrofferCenters[x] - geo.Spawn).sqrMagnitude
+                                 .CompareTo((geo.TrofferCenters[y] - geo.Spawn).sqrMagnitude));
+            var wantShadows = new HashSet<int>();
+            for (int k = 0; k < order.Count && k < 4; k++) wantShadows.Add(order[k]);
 
             for (int i = 0; i < geo.TrofferCenters.Count; i++)
             {
                 if (!geo.TrofferAlive[i]) continue;
                 var p = geo.TrofferCenters[i];
 
-                var go = new GameObject($"Troffer_{i:00}");
+                var go = new GameObject($"Troffer_{i:000}");
                 go.transform.SetParent(root.transform, false);
                 go.transform.position = new Vector3(p.x, p.y - 0.012f, p.z);
                 go.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
@@ -106,16 +120,14 @@ namespace Backrooms.EditorTools
                 catch (Exception e) { Log.Add("  light setup failed: " + e.Message); }
 
                 // 蛍光灯は黒体放射ではない。水銀の 546nm の輝線が強く出るため、
-                // 色温度では表せない緑寄りの色になる。これが参照の「病んだ黄緑」の
-                // 正体で、黒体の 4200K からは絶対に出ない。
-                // HDRP は color.linear x CCT(T) を掛けるので、色温度を使うと
-                // 必ず黒体の軌跡上に乗ってしまう。ここは色温度を切って直接指定する。
+                // 色温度では表せない緑寄りの色になる。HDRP は
+                // color.linear x CCT(T) を掛けるので、色温度を使うと必ず
+                // 黒体の軌跡上に乗ってしまう。ここは色温度を切って直接指定する。
                 // 参照の実測から逆算: 実効リニア (1.000, 0.943, 0.500)。
-                // R/G = 1.06、B/R = 0.50。暖白色の蛍光管に相当する。
                 light.useColorTemperature = false;
                 light.color = new Color(1.0f, 0.974f, 0.735f);
 
-                bool wantShadow = shadowed < 4 && p.z < 8f;
+                bool wantShadow = wantShadows.Contains(i);
                 light.shadows = wantShadow ? LightShadows.Soft : LightShadows.None;
                 if (wantShadow)
                 {
@@ -132,86 +144,44 @@ namespace Backrooms.EditorTools
                 }
                 made++;
             }
-            Log.Add($"lights: {made} area lights ({shadowed} casting shadows)");
+
+            var culler = root.AddComponent<LightCuller>();
+            culler.MaxActive = 28;
+            culler.Radius = 17f;
+            Log.Add($"lights: {made} area lights ({shadowed} casting shadows), "
+                    + $"culler keeps the nearest {culler.MaxActive} within {culler.Radius} m");
         }
 
         // ------------------------------------------------------------ decals
 
         /// <summary>
-        /// 原因が「その場所」に紐づく汚れを置く。
-        /// 壁紙は 2.12m ごとにタイリングするので、手擦れや水の垂れのような
-        /// 一点物をテクスチャに焼くと必ず等間隔で並んで見える。
+        /// 原因が「その場所」に紐づく汚れを置く。壁紙は 2.12m ごとに
+        /// タイリングするので、手擦れや水の垂れのような一点物をテクスチャに
+        /// 焼くと必ず等間隔で並んで見える。位置は生成器が決める。
         /// </summary>
-        static void BuildDecals()
+        static void BuildDecals(Level0Generator.Result geo)
         {
             var root = new GameObject("Decals");
-            Material M(string n) => AssetDatabase.LoadAssetAtPath<Material>(MatRoot + "/" + n + ".mat");
-            var scuff = M("M_Decal_Scuff");
-            var drip = M("M_Decal_Drip");
-            var traffic = M("M_Decal_Traffic");
-            var dent = M("M_Decal_Dent");
-            int n = 0;
-
-            // --- 外角の手擦れ。人が角を曲がるときに手と肩が当たる高さ ---
-            // 柱 (3.40-3.80, 5.20-5.60) の、通路側を向いた 2 面
-            n += Add(root, scuff, "Scuff_Col_A", new Vector3(3.40f, 1.05f, 5.34f),
-                     new Vector3(0f, -90f, 0f), new Vector2(0.42f, 0.95f));
-            n += Add(root, scuff, "Scuff_Col_B", new Vector3(3.66f, 1.05f, 5.20f),
-                     new Vector3(0f, 180f, 0f), new Vector2(0.42f, 0.95f));
-            // 袖壁 (7.50-7.65, z 0-3.60) の先端
-            n += Add(root, scuff, "Scuff_Fin", new Vector3(7.50f, 1.05f, 3.42f),
-                     new Vector3(0f, -90f, 0f), new Vector2(0.40f, 0.95f));
-            // 開口の枠脇。ここは最も触られる
-            n += Add(root, scuff, "Scuff_Door", new Vector3(6.95f, 1.05f, 9.00f),
-                     new Vector3(0f, 180f, 0f), new Vector2(0.34f, 1.00f));
-
-            // --- 天井から垂れた水の筋。天井際から下に向かって落ちる ---
-            n += Add(root, drip, "Drip_East", new Vector3(12.00f, 1.95f, 3.10f),
-                     new Vector3(0f, -90f, 0f), new Vector2(1.10f, 1.55f));
-            n += Add(root, drip, "Drip_North", new Vector3(9.40f, 1.95f, 9.00f),
-                     new Vector3(0f, 180f, 0f), new Vector2(0.95f, 1.50f));
-            n += Add(root, drip, "Drip_RoomB", new Vector3(3.00f, 1.80f, 12.40f),
-                     new Vector3(0f, 90f, 0f), new Vector2(0.90f, 1.35f));
-
-            // --- カーペットの通行帯。毛足が踏み倒されて沈み、わずかに艶が出る ---
-            // 床は真下に投影する。回転 (90,yaw,0) で local +Z が下を向く。
-            n += Add(root, traffic, "Traffic_ToDoor", new Vector3(6.00f, 0f, 5.20f),
-                     new Vector3(90f, 0f, 0f), new Vector2(1.45f, 7.20f));
-            n += Add(root, traffic, "Traffic_Cross", new Vector3(5.40f, 0f, 4.40f),
-                     new Vector3(90f, 90f, 0f), new Vector2(1.30f, 8.80f));
-            n += Add(root, traffic, "Traffic_RoomB", new Vector3(6.00f, 0f, 11.60f),
-                     new Vector3(90f, 0f, 0f), new Vector2(1.30f, 4.60f));
-
-            // --- 掃除機の筋。通行の少ない隅にだけ、最後に清掃された向きが残る ---
-            var vac = M("M_Decal_Vacuum");
-            n += Add(root, vac, "Vacuum_NE", new Vector3(10.20f, 0f, 6.60f),
-                     new Vector3(90f, 0f, 0f), new Vector2(3.20f, 3.00f));
-            n += Add(root, vac, "Vacuum_SW", new Vector3(2.40f, 0f, 7.20f),
-                     new Vector3(90f, 90f, 0f), new Vector2(3.00f, 2.80f));
-
-            // --- 家具の脚が長く乗っていた跡。4 点で 1 組の机 ---
-            foreach (var (dx, dz) in new[] { (0f, 0f), (1.40f, 0f), (0f, 0.70f), (1.40f, 0.70f) })
-                n += Add(root, dent, "Dent", new Vector3(1.90f + dx, 0f, 1.80f + dz),
-                         new Vector3(90f, 0f, 0f), new Vector2(0.11f, 0.11f));
-
-            Log.Add($"decals: {n} projectors");
-        }
-
-        static int Add(GameObject root, Material mat, string name,
-                       Vector3 pos, Vector3 euler, Vector2 size, float depth = 0.45f)
-        {
-            if (mat == null) { Log.Add("  decal material missing for " + name); return 0; }
-            var go = new GameObject(name);
-            go.transform.SetParent(root.transform, false);
-            go.transform.position = pos;
-            go.transform.rotation = Quaternion.Euler(euler);
-            var dp = go.AddComponent<DecalProjector>();
-            dp.material = mat;
-            dp.size = new Vector3(size.x, size.y, depth);
-            dp.pivot = Vector3.zero;
-            dp.drawDistance = 45f;
-            dp.fadeFactor = 1f;
-            return 1;
+            Material M(string n) => AssetDatabase.LoadAssetAtPath<Material>(MatRoot + "/M_Decal_" + n + ".mat");
+            var cache = new Dictionary<string, Material>();
+            int placed = 0, miss = 0;
+            foreach (var d in geo.Decals)
+            {
+                if (!cache.TryGetValue(d.Kind, out var mat)) { mat = M(d.Kind); cache[d.Kind] = mat; }
+                if (mat == null) { miss++; continue; }
+                var go = new GameObject("Decal_" + d.Kind + "_" + placed);
+                go.transform.SetParent(root.transform, false);
+                go.transform.position = d.Pos;
+                go.transform.rotation = Quaternion.Euler(d.Euler);
+                var dp = go.AddComponent<DecalProjector>();
+                dp.material = mat;
+                dp.size = new Vector3(d.Size.x, d.Size.y, 0.45f);
+                dp.pivot = Vector3.zero;
+                dp.drawDistance = 45f;
+                dp.fadeFactor = 1f;
+                placed++;
+            }
+            Log.Add($"decals: {placed} projectors" + (miss > 0 ? $" ({miss} skipped, material missing)" : ""));
         }
 
         // ------------------------------------------------------------ volume
@@ -333,7 +303,10 @@ namespace Backrooms.EditorTools
             Set(bloom, "scatter", 0.62f);
 
             var chroma = AddOverride<ChromaticAberration>(profile);
-            Set(chroma, "intensity", 0.055f); // 周辺の色収差。効かせすぎると玩具に見える
+            // 0.055 では天井のスプリンクラーのような小さく明るい物に虹の縁が出て、
+            // レンズの性質ではなく描画の破綻に見えていた。実レンズの色収差は
+            // 画面周辺でようやく分かる程度。
+            Set(chroma, "intensity", 0.030f);
 
             var vig = AddOverride<Vignette>(profile);
             Set(vig, "intensity", 0.13f);     // レンズの周辺光量落ち
@@ -386,11 +359,11 @@ namespace Backrooms.EditorTools
         }
 
         // ------------------------------------------------------------ player
-        static void BuildPlayer()
+        static void BuildPlayer(Level0Generator.Result geo)
         {
             var player = new GameObject("Player");
-            player.transform.position = new Vector3(1.6f, 0f, 1.6f);
-            player.transform.rotation = Quaternion.Euler(0f, 32f, 0f);
+            player.transform.position = geo.Spawn;
+            player.transform.rotation = Quaternion.Euler(0f, geo.SpawnYaw, 0f);
             player.AddComponent<CharacterController>();
             player.AddComponent<FirstPersonController>();
 
@@ -457,7 +430,20 @@ namespace Backrooms.EditorTools
             torchGo.AddComponent<HDAdditionalLightData>();
             torchGo.AddComponent<Flashlight>();
 
-            Log.Add("player rig built at " + player.transform.position);
+            // 生成された間取りに合わせた視点をシーンに載せる。
+            // 直書きの座標は、間取りが乱数で決まる以上もう使えない。
+            var routeGo = new GameObject("CaptureRoute");
+            var route = routeGo.AddComponent<CaptureRoute>();
+            var shots = new List<FlatCaptureRunner.Shot>();
+            foreach (var s in geo.Shots)
+                shots.Add(new FlatCaptureRunner.Shot(s.Name, s.Pos, s.Yaw, s.Pitch, s.Light));
+            route.Shots = shots.ToArray();
+            route.FpsProbe = geo.Spawn;
+            route.FpsYaw = geo.SpawnYaw;
+            route.Waypoints = geo.Walk.ToArray();
+
+            Log.Add($"player rig built at {player.transform.position} yaw {geo.SpawnYaw:F0}, "
+                    + $"{route.Shots.Length} capture views");
         }
 
         // ----------------------------------------------------------- helpers

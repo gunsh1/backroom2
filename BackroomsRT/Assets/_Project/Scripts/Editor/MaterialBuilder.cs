@@ -97,30 +97,45 @@ namespace Backrooms.EditorTools
             Save(carpet);
 
             // ------------------------------------------------------ 天井タイル
-            var ceil = Make("M_CeilingTile");
-            SetTex(ceil, "_BaseColorMap", Tex("OfficeCeiling001/OfficeCeiling_Aged_Color.png"));
-            SetTex(ceil, "_NormalMap", Tex("OfficeCeiling001/OfficeCeiling001_NormalGL.jpg"));
-            SetTex(ceil, "_MaskMap", Tex("OfficeCeiling001/OfficeCeiling001_MaskMap.png"));
-            SetCol(ceil, "_BaseColor", Srgb(0.780f, 0.665f, 0.475f));  // 黄ばんだ吸音タイル
-            // Quality RTGI でバウンスが届くようになり Y=0.255 (参照 0.111) と
-            // 明るくなりすぎた。実測から逆算した実効アルベド (0.318, 0.200, 0.052)。
-            // 参照の天井タイルは B/R 0.116 / R/G 1.796 とかなり濃いタン。
-            // 参照の天井タイルは Y=0.111 と最も暗い面で、壁の 0.45 倍 (1.15 段下)。
-            // ほぼ白のタイルでは絶対にこの関係にならない。
-            // 逆算した実効アルベド (0.476, 0.360, 0.169)。
-            SetF(ceil, "_NormalScale", 0.9f);
-            Smoothness(ceil, 0.02f, 0.16f);                             // 吸音材はほぼ無反射
-            SetF(ceil, "_AORemapMin", 0.45f);
-            // HDRP の RTGI は下向き面に運ぶ間接光が実測で 5-6 倍足りない。
-            // clamp、Quality モード、間接倍率のいずれでも埋まらず、
-            // 天井/壁比は参照の 0.404 に対し 0.15 が上限だった。
-            // 不足分を微弱な自発光で埋める。物理ではなく補填。
-            // 色は室内の光と同じにして、ここだけ色が浮かないようにする。
-            // 90 nits は強すぎて天井が 0.278 (参照 0.111)、しかも色がオレンジ過ぎて
-            // 室内全体の R/G を 1.68 (参照 1.323) まで押し上げた。
-            // 実測から 27 nits、色は光源と同じにして室内の色相を動かさない。
-            Emissive(ceil, Srgb(1.00f, 0.974f, 0.735f), nits: 10f);   // 27 でも天井 0.257 (参照 0.111)
-            Save(ceil);
+            // ambientCG の写真 1 枚を 6x6 に切って使っていたが、元が「タイル 1 枚」の
+            // 撮影なので、切り出したセルの中にタイルの縁が無く、1 枚としての
+            // まとまりも無かった。実物の鉱物繊維タイルを構成する要素
+            // （押し出し方向の亀裂・針穴・グリッドの隙間を空気が抜けることで
+            // 外周だけが吸う埃・雨漏りの潮目）を持つ 8x8 のアトラスを自前で焼く。
+            // tools/make-ceiling-textures.py
+            void CeilingTile(string name, float fillNits)
+            {
+                var c = Make(name);
+                SetTex(c, "_BaseColorMap", Tex("OfficeCeiling001/CeilingTile_Atlas_Color.png"));
+                SetTex(c, "_NormalMap", Tex("OfficeCeiling001/CeilingTile_Atlas_NormalGL.png"));
+                SetTex(c, "_MaskMap", Tex("OfficeCeiling001/CeilingTile_Atlas_MaskMap.png"));
+                SetCol(c, "_BaseColor", Srgb(0.834f, 0.739f, 0.564f));
+                // 亀裂は実測で幅 2-4mm、深さ 1mm 程度。0.5 では波打った漆喰に見えた。
+                SetF(c, "_NormalScale", 0.25f);
+                Smoothness(c, 0.05f, 0.20f);
+                SetF(c, "_AORemapMin", 0.45f);
+                if (fillNits > 0f) Emissive(c, Srgb(1.00f, 0.974f, 0.735f), nits: fillNits);
+                Save(c);
+            }
+            // 補填の 10 nits は「埋めるべき光がある所」にだけ入れる。
+            // 蛍光灯が全部落ちている区画にまで掛けると、真っ暗であるべき部屋の
+            // 天井だけが光り続ける。
+            CeilingTile("M_CeilingTile", 10f);
+            CeilingTile("M_CeilingTileDark", 0f);
+
+            // 参照から逆算した実効アルベド linear (0.5255, 0.3633, 0.1702) を保つ。
+            // 新しいアトラスの素の明度は linear (0.793, 0.720, 0.612) で、
+            // 旧テクスチャ (0.931, 0.916, 0.906) より暗く黄色いぶんティントは薄い。
+            // 値は CeilingTile() の中にまとめてある。
+
+            // ------------------------------------------------------ 天井裏
+            // タイルが 1 枚抜けた穴から見える。断熱材と鋼製デッキの裏は
+            // ほぼ光が入らないので、実効反射率 2% 程度の黒。
+            var plenum = Make("M_Plenum");
+            SetCol(plenum, "_BaseColor", Srgb(0.16f, 0.15f, 0.13f));
+            SetF(plenum, "_Metallic", 0f);
+            SetF(plenum, "_Smoothness", 0.05f);
+            Save(plenum);
 
             // -------------------------------------------- T バー／トロファー枠
             var metal = Make("M_GridMetal");
@@ -129,7 +144,20 @@ namespace Backrooms.EditorTools
             // ただし素の反射率が linear 0.53 と低かったので、白塗装の 0.69 に寄せる。
             SetF(metal, "_Metallic", 0f);
             SetF(metal, "_Smoothness", 0.30f);   // 埃を被った塗装は光らない
+            // T バーも天井タイルと同じ「真下を向いた面」で、RTGI が運ぶ間接光が
+            // 同じだけ足りない。タイルにだけ 10 nits の補填を入れていたので、
+            // 補填の無いバーが取り残されて実測でタイルの 1.7 段下 (比 0.31) の
+            // 黒い格子になっていた。実物の T バーはタイルの 0.45 段下 (比 0.73)。
+            // 補填のうちアルベド比で見合う分を戻す: 10 nits x 0.47 = 5 nits。
+            Emissive(metal, Srgb(1.00f, 0.974f, 0.735f), nits: 6f);   // 5 では 0.60 段 (目標 0.45)
             Save(metal);
+
+            // 暗黒区画用。補填を外しただけの同じ塗装鋼板。
+            var metalDark = Make("M_GridMetalDark");
+            SetCol(metalDark, "_BaseColor", Srgb(0.845f, 0.815f, 0.560f));
+            SetF(metalDark, "_Metallic", 0f);
+            SetF(metalDark, "_Smoothness", 0.30f);
+            Save(metalDark);
 
             // ---------------------------------------------------------- 幅木
             var baseb = Make("M_Baseboard");

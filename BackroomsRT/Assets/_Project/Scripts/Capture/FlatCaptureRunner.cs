@@ -34,7 +34,11 @@ namespace Backrooms.Capture
 
         readonly List<string> _log = new List<string>();
 
-        static readonly Shot[] Shots =
+        /// <summary>
+        /// シーンに CaptureRoute があればそちらを使う。間取りが乱数で決まる
+        /// ようになったので、直書きの座標は生成器が無い場合の保険でしかない。
+        /// </summary>
+        static readonly Shot[] Fallback =
         {
             new Shot("01_hero",     new Vector3( 1.60f, 0f,  1.60f),  30f,   2f),
             new Shot("02_corner",   new Vector3( 5.00f, 0f,  2.20f), 245f,  22f),
@@ -60,6 +64,10 @@ namespace Backrooms.Capture
             var fps = FindFirstObjectByType<FirstPersonController>();
             var cam = Camera.main;
             var torch = FindFirstObjectByType<Flashlight>();
+            var culler = FindFirstObjectByType<LightCuller>();
+            var route = FindFirstObjectByType<CaptureRoute>();
+            var shots = (route != null && route.Shots != null && route.Shots.Length > 0)
+                        ? route.Shots : Fallback;
             if (fps == null || cam == null)
             {
                 _log.Add("FATAL: FirstPersonController / Camera.main が見つからない");
@@ -73,6 +81,10 @@ namespace Backrooms.Capture
             _log.Add("supportsRayTracing : " + SystemInfo.supportsRayTracing);
             _log.Add("output             : " + Width + "x" + Height);
             _log.Add("lightmaps          : " + LightmapSettings.lightmaps.Length);
+            _log.Add("shots              : " + shots.Length
+                     + (route != null ? " (from CaptureRoute)" : " (fallback)"));
+            _log.Add("area lights        : " + (culler != null ? culler.Count.ToString() : "no culler")
+                     + (culler != null ? "  max active " + culler.MaxActive : ""));
 
             for (int i = 0; i < WarmupFrames; i++) yield return null;
 
@@ -84,12 +96,15 @@ namespace Backrooms.Capture
             rt.Create();
             cam.targetTexture = rt;
 
-            foreach (var s in Shots)
+            foreach (var s in shots)
             {
                 fps.SetPose(s.Pos, s.Yaw, s.Pitch);
                 fps.enabled = false;
                 fps.SetPose(s.Pos, s.Yaw, s.Pitch);
                 if (torch != null) torch.ForceState(s.Light);
+                // 瞬間移動なので、間引きをタイマー任せにすると
+                // 切り替わる前のフレームが撮れる。
+                if (culler != null) culler.Refresh(s.Pos + Vector3.up * 1.68f);
 
                 // ここで毎フレーム rt に描かれ、履歴が積み上がる
                 for (int i = 0; i < SettleFrames; i++) yield return new WaitForEndOfFrame();
@@ -105,8 +120,11 @@ namespace Backrooms.Capture
             if (torch != null) torch.ForceState(false);
 
             // --- fps 計測（照明が多く見通しの利く主室で）---
-            fps.SetPose(new Vector3(3.0f, 0f, 3.0f), 40f, 0f);
+            var probe = route != null ? route.FpsProbe : new Vector3(3.0f, 0f, 3.0f);
+            float probeYaw = route != null ? route.FpsYaw : 40f;
+            fps.SetPose(probe, probeYaw, 0f);
             fps.enabled = false;
+            if (culler != null) culler.Refresh(probe + Vector3.up * 1.68f);
             for (int i = 0; i < 30; i++) yield return null;
 
             float total = 0f, worst = 0f;
@@ -120,7 +138,58 @@ namespace Backrooms.Capture
             _log.Add($"fps: avg={avg:F1}  worst frame={worst * 1000f:F1} ms  ({FpsFrames} frames)"
                      + $"   [{Width}x{Height}]");
 
+            yield return WalkTest(fps, route, culler);
             Finish();
+        }
+
+        /// <summary>
+        /// 生成した間取りを実際に歩いて通れるか確かめる。
+        /// ベイのグラフ上の連結を確認しただけでは歩けることの証明にならない。
+        /// コライダ・開口の有効幅・敷居の段差のどれかが引っ掛かれば止まる。
+        /// </summary>
+        IEnumerator WalkTest(FirstPersonController fps, CaptureRoute route, LightCuller culler)
+        {
+            if (route == null || route.Waypoints == null || route.Waypoints.Length < 2)
+            {
+                _log.Add("walk: no route");
+                yield break;
+            }
+            var wp = route.Waypoints;
+            fps.SetPose(wp[0], route.FpsYaw, 0f);
+            fps.enabled = true;
+            fps.UseExternalInput = true;
+            fps.ExternalMove = new Vector2(0f, 1f);
+
+            int reached = 0;
+            float t0 = Time.unscaledTime, stuckAt = -1f;
+            float travelled = 0f;
+
+            for (int k = 1; k < wp.Length; k++)
+            {
+                float deadline = Time.unscaledTime + 12f;
+                while (Time.unscaledTime < deadline)
+                {
+                    var p = fps.transform.position;
+                    var to = wp[k] - p; to.y = 0f;
+                    if (to.magnitude < 0.40f) break;
+                    fps.SetYaw(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg);
+                    if (culler != null && k % 2 == 0) culler.Refresh(p + Vector3.up * 1.68f);
+                    yield return null;
+                    travelled += Vector3.Distance(new Vector3(p.x, 0f, p.z),
+                                                  new Vector3(fps.transform.position.x, 0f, fps.transform.position.z));
+                }
+                var d = wp[k] - fps.transform.position; d.y = 0f;
+                if (d.magnitude < 0.40f) reached++;
+                else { stuckAt = k; break; }
+            }
+            fps.ExternalMove = Vector2.zero;
+            fps.UseExternalInput = false;
+            fps.enabled = false;
+
+            float dt = Time.unscaledTime - t0;
+            _log.Add($"walk: reached {reached}/{wp.Length - 1} waypoints in {dt:F1} s, "
+                     + $"travelled {travelled:F1} m"
+                     + (stuckAt >= 0 ? $"  STUCK before waypoint {stuckAt} at {fps.transform.position}" : "  OK"));
         }
 
         /// <summary>蓄積済みの RT をそのまま PNG に書き出す。</summary>

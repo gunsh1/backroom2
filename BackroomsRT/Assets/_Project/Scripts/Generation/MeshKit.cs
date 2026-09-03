@@ -123,6 +123,20 @@ namespace Backrooms.Generation
             PlaneZY(min.z, max.z, min.y, max.y, min.x, false, uvScale);  // -X
         }
 
+        /// <summary>
+        /// 内向きに張った箱（上面と 4 側面のみ、底は開いたまま）。
+        /// 天井タイルが落ちた穴から見える天井裏に使う。外向きの箱では
+        /// 穴の中が見えず、黒い板を貼っただけになる。
+        /// </summary>
+        public void BoxInside(Vector3 min, Vector3 max, float uvScale)
+        {
+            PlaneXZ(min.x, max.x, min.z, max.z, max.y, false, uvScale);   // 天井裏の上面
+            PlaneXY(min.x, max.x, min.y, max.y, min.z, true, uvScale);
+            PlaneXY(min.x, max.x, min.y, max.y, max.z, false, uvScale);
+            PlaneZY(min.z, max.z, min.y, max.y, min.x, true, uvScale);
+            PlaneZY(min.z, max.z, min.y, max.y, max.x, false, uvScale);
+        }
+
         public void BoxSize(Vector3 center, Vector3 size, float uvScale)
         {
             Box(center - size * 0.5f, center + size * 0.5f, uvScale);

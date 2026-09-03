@@ -43,6 +43,14 @@ namespace Backrooms.Player
         /// <summary>接地した瞬間に立つフラグ。足音のトリガに使う。</summary>
         public bool SteppedThisFrame { get; private set; }
 
+        /// <summary>
+        /// 自動テスト用の入力差し込み口。これを立てるとキーボードとマウスを
+        /// 一切読まなくなるので、生成した間取りを歩いて通れるかを
+        /// バッチで確かめられる。
+        /// </summary>
+        [System.NonSerialized] public bool UseExternalInput;
+        [System.NonSerialized] public Vector2 ExternalMove;
+
         CharacterController _cc;
         Vector3 _velocity;
         float _yaw, _pitch;
@@ -78,8 +86,11 @@ namespace Backrooms.Player
         void Update()
         {
             SteppedThisFrame = false;
-            HandleCursor();
-            HandleLook();
+            if (!UseExternalInput)
+            {
+                HandleCursor();
+                HandleLook();
+            }
             HandleCrouch();
             HandleMove();
             ApplyHeadMotion();
@@ -136,12 +147,17 @@ namespace Backrooms.Player
 
         void HandleMove()
         {
-            Vector2 input = Vector2.zero;
-            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) input.y += 1f;
-            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) input.y -= 1f;
-            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) input.x += 1f;
-            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) input.x -= 1f;
-            bool sprintHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            Vector2 input = ExternalMove;
+            bool sprintHeld = false;
+            if (!UseExternalInput)
+            {
+                input = Vector2.zero;
+                if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) input.y += 1f;
+                if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) input.y -= 1f;
+                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) input.x += 1f;
+                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) input.x -= 1f;
+                sprintHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            }
             if (input.sqrMagnitude > 1f) input.Normalize();
 
             IsSprinting = sprintHeld && !IsCrouching && input.y > 0.1f;
@@ -183,6 +199,13 @@ namespace Backrooms.Player
 
             Head.localPosition = new Vector3(bobX, _currentHeight + EyeOffset + bobY, 0f);
             Head.localRotation = Quaternion.Euler(_pitch, 0f, roll);
+        }
+
+        /// <summary>向きだけを変える。速度は保つので歩きながら曲がれる。</summary>
+        public void SetYaw(float yaw)
+        {
+            _yaw = yaw;
+            transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
         }
 
         /// <summary>キャプチャ・デバッグ用に姿勢を直接指定する。</summary>

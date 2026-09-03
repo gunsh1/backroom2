@@ -4,13 +4,16 @@ graphicsDeviceName : NVIDIA GeForce RTX 3060
 supportsRayTracing : True
 output             : 1920x1080
 lightmaps          : 0
-shot: 01_hero  pos=(1.60, 0.00, 1.60) yaw=30 pitch=2
-shot: 02_corner  pos=(5.00, 0.00, 2.20) yaw=245 pitch=22
-shot: 03_ceiling  pos=(4.40, 0.00, 4.40) yaw=20 pitch=-26
-shot: 04_doorway  pos=(6.00, 0.00, 6.40) yaw=4 pitch=1
-shot: 05_backroom  pos=(5.20, 0.00, 13.60) yaw=190 pitch=2
-shot: 06_detail  pos=(1.30, 0.00, 4.20) yaw=265 pitch=34
-shot: 07_torch  pos=(5.60, 0.00, 12.40) yaw=200 pitch=0  torch=ON
-shot: 08_switch  pos=(6.90, 0.00, 7.60) yaw=10 pitch=-4
-shot: 09_conduit  pos=(2.20, 0.00, 6.20) yaw=228 pitch=14
-fps: avg=85.7  worst frame=13.0 ms  (180 frames)   [1920x1080]
+shots              : 9 (from CaptureRoute)
+area lights        : 60  max active 28
+shot: 01_hero  pos=(3.60, 0.00, 3.60) yaw=90 pitch=2
+shot: 02_depth  pos=(1.20, 0.00, 1.20) yaw=0 pitch=1
+shot: 03_ceiling  pos=(1.20, 0.00, 1.20) yaw=18 pitch=-30
+shot: 04_doorway  pos=(13.80, 0.00, 6.00) yaw=90 pitch=1
+shot: 05_columns  pos=(6.00, 0.00, 10.80) yaw=-173.6598 pitch=0
+shot: 06_detail  pos=(4.00, 0.00, 4.00) yaw=240 pitch=32
+shot: 07_torch  pos=(15.60, 0.00, 13.20) yaw=0 pitch=0  torch=ON
+shot: 08_dark_edge  pos=(13.20, 0.00, 10.80) yaw=24 pitch=-4
+shot: 09_bulkhead  pos=(4.60, 0.00, 1.20) yaw=90 pitch=-22
+fps: avg=29.3  worst frame=36.7 ms  (180 frames)   [1920x1080]
+walk: reached 9/9 waypoints in 14.2 s, travelled 19.6 m  OK
