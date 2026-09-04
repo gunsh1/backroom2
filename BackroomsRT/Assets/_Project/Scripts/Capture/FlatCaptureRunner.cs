@@ -75,6 +75,8 @@ namespace Backrooms.Capture
                 yield break;
             }
 
+            float eyeH = route != null ? route.EyeHeight : 1.68f;
+
             _log.Add("=== capture ===");
             _log.Add("graphicsDeviceType : " + SystemInfo.graphicsDeviceType);
             _log.Add("graphicsDeviceName : " + SystemInfo.graphicsDeviceName);
@@ -104,7 +106,7 @@ namespace Backrooms.Capture
                 if (torch != null) torch.ForceState(s.Light);
                 // 瞬間移動なので、間引きをタイマー任せにすると
                 // 切り替わる前のフレームが撮れる。
-                if (culler != null) culler.Refresh(s.Pos + Vector3.up * 1.68f);
+                if (culler != null) culler.Refresh(s.Pos + Vector3.up * eyeH);
 
                 // ここで毎フレーム rt に描かれ、履歴が積み上がる
                 for (int i = 0; i < SettleFrames; i++) yield return new WaitForEndOfFrame();

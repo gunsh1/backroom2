@@ -25,8 +25,45 @@ namespace Backrooms.EditorTools
         const string MatRoot = "Assets/_Project/Art/Materials";
         static readonly List<string> Log = new List<string>();
 
+        // 生成器ごとに変わる撮影条件。既定は M2 の乱数生成シーン。
+        // 複製シーンでは参照画像から逆算した値に差し替える。
+        static float _fovV = 47f;          // 垂直画角
+        static float _eyeH = 1.68f;        // 視点高
+        static Vector2 _areaSize = new Vector2(1.16f, 0.56f);  // 2x4 トロファーの発光面
+        static float _lumens = 3200f;
+        static int _maxActiveLights = 28;
+        static float _lightRadius = 17f;
+
         [MenuItem("Backrooms/3. Build Scene")]
         public static void Build()
+        {
+            _fovV = 47f; _eyeH = 1.68f;
+            _areaSize = new Vector2(1.16f, 0.56f); _lumens = 3200f;
+            _maxActiveLights = 28; _lightRadius = 17f;
+            BuildWith(null);
+        }
+
+        /// <summary>
+        /// 参照画像と同じ構造を組んだ複製シーン。カメラも器具も参照から
+        /// 逆算した値に差し替える (tools/reverse-geometry.py)。
+        ///
+        /// 器具は 600 角の 2x2 が 1.8m 格子。1 台あたり 3.24 平米を受け持つので
+        /// 2 灯 32W の U 字管が 6 割の出力、と置くと 1600 lm。床面で 490 lx 相当。
+        /// 実在のオフィスの設計照度 300-500 lx に収まる。
+        /// </summary>
+        [MenuItem("Backrooms/3b. Build Replica Scene")]
+        public static void BuildReplicaScene()
+        {
+            _fovV = Level0Replica.FovV;
+            _eyeH = Level0Replica.EyeH;
+            _areaSize = new Vector2(0.556f, 0.556f);
+            _lumens = 1600f;
+            // 参照は 35m 先まで照らされている。近い 28 台だけでは床が届かない。
+            _maxActiveLights = 80; _lightRadius = 34f;
+            BuildWith(Level0Replica.Build);
+        }
+
+        static void BuildWith(Func<MaterialSet, Level0Generator.Result> gen)
         {
             Log.Clear();
             Log.Add("=== SceneBuilder (photoreal) " + DateTime.Now + " ===");
@@ -34,7 +71,7 @@ namespace Backrooms.EditorTools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             var mats = LoadMaterials();
-            var geo = Level0Generator.Build(mats);
+            var geo = gen == null ? Level0Generator.Build(mats) : gen(mats);
             Log.AddRange(geo.Log);
 
             BuildLights(geo);
@@ -110,10 +147,10 @@ namespace Backrooms.EditorTools
                 try
                 {
                     hd.SetLightTypeAndShape(HDLightTypeAndShape.RectangleArea);
-                    hd.SetAreaLightSize(new Vector2(1.16f, 0.56f));
+                    hd.SetAreaLightSize(_areaSize);
                     // 4 灯 32W の T8 が入った古い 2x4 トロファー相当。
                     // 器具の汚れと管の劣化で新品の 6 割程度しか出ていない想定。
-                    hd.SetIntensity(3200f, LightUnit.Lumen);
+                    hd.SetIntensity(_lumens, LightUnit.Lumen);
                     hd.range = 9f;
                     hd.affectsVolumetric = true;
                 }
@@ -146,8 +183,8 @@ namespace Backrooms.EditorTools
             }
 
             var culler = root.AddComponent<LightCuller>();
-            culler.MaxActive = 28;
-            culler.Radius = 17f;
+            culler.MaxActive = _maxActiveLights;
+            culler.Radius = _lightRadius;
             Log.Add($"lights: {made} area lights ({shadowed} casting shadows), "
                     + $"culler keeps the nearest {culler.MaxActive} within {culler.Radius} m");
         }
@@ -369,7 +406,11 @@ namespace Backrooms.EditorTools
 
             var head = new GameObject("Head");
             head.transform.SetParent(player.transform, false);
-            head.transform.localPosition = new Vector3(0f, 1.68f, 0f);
+            head.transform.localPosition = new Vector3(0f, _eyeH, 0f);
+            // 目の高さは StandHeight + EyeOffset で決まる。参照のカムコーダは
+            // 胸の高さ (1.345m) なので、身長はそのままに EyeOffset で下げる。
+            player.GetComponent<FirstPersonController>().EyeOffset
+                = _eyeH - player.GetComponent<FirstPersonController>().StandHeight;
 
             var camGo = new GameObject("MainCamera");
             camGo.transform.SetParent(head.transform, false);
@@ -377,7 +418,7 @@ namespace Backrooms.EditorTools
             // 垂直 47 度 = 16:9 で水平 75.4 度、フルサイズ換算 24mm。
             // 実際の室内・建築写真がこの画角で撮られている。これより狭いと
             // 空間の広がりが読めず、これより広いと周辺の引き伸ばしが CG に見える。
-            cam.fieldOfView = 47f;
+            cam.fieldOfView = _fovV;
             cam.nearClipPlane = 0.05f;
             cam.farClipPlane = 80f;
             cam.allowHDR = true;
@@ -438,6 +479,7 @@ namespace Backrooms.EditorTools
             foreach (var s in geo.Shots)
                 shots.Add(new FlatCaptureRunner.Shot(s.Name, s.Pos, s.Yaw, s.Pitch, s.Light));
             route.Shots = shots.ToArray();
+            route.EyeHeight = _eyeH;
             route.FpsProbe = geo.Spawn;
             route.FpsYaw = geo.SpawnYaw;
             route.Waypoints = geo.Walk.ToArray();

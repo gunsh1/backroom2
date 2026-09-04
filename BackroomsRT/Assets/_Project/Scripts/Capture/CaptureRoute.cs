@@ -12,6 +12,8 @@ namespace Backrooms.Capture
     public class CaptureRoute : MonoBehaviour
     {
         public FlatCaptureRunner.Shot[] Shots;
+        /// <summary>ライト間引きを撮影位置で強制更新するときに使う目の高さ。</summary>
+        public float EyeHeight = 1.68f;
         public Vector3 FpsProbe;      // fps 計測に使う立ち位置
         public float FpsYaw;
 

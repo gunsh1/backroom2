@@ -4,16 +4,11 @@ graphicsDeviceName : NVIDIA GeForce RTX 3060
 supportsRayTracing : True
 output             : 1920x1080
 lightmaps          : 0
-shots              : 9 (from CaptureRoute)
-area lights        : 60  max active 28
-shot: 01_hero  pos=(3.60, 0.00, 3.60) yaw=90 pitch=2
-shot: 02_depth  pos=(1.20, 0.00, 1.20) yaw=0 pitch=1
-shot: 03_ceiling  pos=(1.20, 0.00, 1.20) yaw=18 pitch=-30
-shot: 04_doorway  pos=(13.80, 0.00, 6.00) yaw=90 pitch=1
-shot: 05_columns  pos=(6.00, 0.00, 10.80) yaw=-173.6598 pitch=0
-shot: 06_detail  pos=(4.00, 0.00, 4.00) yaw=240 pitch=32
-shot: 07_torch  pos=(15.60, 0.00, 13.20) yaw=0 pitch=0  torch=ON
-shot: 08_dark_edge  pos=(13.20, 0.00, 10.80) yaw=24 pitch=-4
-shot: 09_bulkhead  pos=(4.60, 0.00, 1.20) yaw=90 pitch=-22
-fps: avg=29.3  worst frame=36.7 ms  (180 frames)   [1920x1080]
-walk: reached 9/9 waypoints in 14.2 s, travelled 19.6 m  OK
+shots              : 4 (from CaptureRoute)
+area lights        : 380  max active 80
+shot: R1_match  pos=(4.53, 0.00, 2.40) yaw=36.59 pitch=-2.27
+shot: R2_ceiling  pos=(9.00, 0.00, 6.00) yaw=40 pitch=-22
+shot: R3_corner  pos=(9.60, 0.00, 13.80) yaw=78 pitch=0
+shot: R4_corridor  pos=(19.80, 0.00, 21.00) yaw=12 pitch=0
+fps: avg=82.3  worst frame=14.2 ms  (180 frames)   [1920x1080]
+walk: reached 2/2 waypoints in 17.6 s, travelled 24.5 m  OK

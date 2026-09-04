@@ -1,45 +1,12 @@
-=== SceneBuilder (photoreal) 2026/09/03 21:14:48 ===
-connectivity: all 90 bays reachable (opened 5 walls)
-plan: 10x9 bays = 24.0 x 21.6 m,  8 zones,  95 wall segments (11 with openings),  6 columns
-  zone 0: bays [0,3) x [0,4)  ceiling 2.40 m  lit
-  zone 1: bays [3,5) x [0,4)  ceiling 2.70 m  lit
-  zone 2: bays [0,3) x [4,9)  ceiling 3.00 m  sparse
-  zone 3: bays [3,5) x [4,9)  ceiling 2.70 m  lit
-  zone 4: bays [5,8) x [0,4)  ceiling 2.70 m  lit
-  zone 5: bays [8,10) x [0,4)  ceiling 2.40 m  sparse
-  zone 6: bays [5,7) x [4,9)  ceiling 2.70 m  DARK
-  zone 7: bays [7,10) x [4,9)  ceiling 2.70 m  lit
-plan map  ( | 壁 / : 開口 / --- 壁 / -D- 開口 / * 柱 / L=2.40 M=2.70 H=3.00 / 数字は区画 )
-  +---+---+---+---+---+---+---+---+---+---+
-  |2~H 2~H|2~H 3 M:3 M|6#M 6#M|7 M 7 M 7 M|
-  +   +   +---+   +---+---+   +   +   +   +
-  |2~H 2~H:2~H|3 M|3 M 6#M 6#M 7 M 7 M:7 M|
-  +   +---+---+   +   +---+   +   +   +   +
-  |2~H|2~H 2*H:3 M 3*M:6#M 6#M|7 M 7 M 7 M|
-  +   +   +   +   +   +   +   +-D-+   +-D-+
-  |2~H|2~H 2*H 3 M 3*M 6#M|6#M|7 M 7*M 7 M|
-  +   +   +   +   +   +---+   +   +   +   +
-  |2~H 2~H 2~H|3 M 3 M 6#M 6#M:7 M 7 M|7 M|
-  +   +   +-D-+---+---+   +---+---+   +   +
-  |0 L 0 L|0 L|1 M 1 M:4 M 4 M 4 M 5~L 5~L|
-  +   +---+   +---+   +   +---+   +   +   +
-  |0 L 0 L 0 L 1 M|1 M|4 M 4 M:4 M 5~L:5~L|
-  +   +   +   +   +   +   +---+   +---+   +
-  |0 L 0 L 0*L:1 M|1 M|4 M 4 M 4 M|5~L 5~L|
-  +-D-+   +   +   +   +---+---+---+   +---+
-  |0 L|0 L 0 L 1 M 1 M:4 M:4 M 4 M|5~L 5~L|
-  +---+---+---+---+---+---+---+---+---+---+
-PLAN BX=10 BZ=9 BAY=2.4
-PLAN_WX 111111111100001100000100021020110210011000012211200201200001000002021101110000000002010020111111111
-PLAN_WZ 1200000001100100010110002001111001100001100010001111000101111111100001110010200110100000011100002001
-PLAN_CELL 0L0.0L0.0L0.0L0.2H1.2H1.2H1.2H1.2H1.0L0.0L0.0L0.0L0.2H1.2H1.2H1.2H1.2H1.0L0.0L0*0L0.0L0.2H1.2H1*2H1*2H1.2H1.1M0.1M0.1M0.1M0.3M0.3M0.3M0.3M0.3M0.1M0.1M0.1M0.1M0.3M0.3M0*3M0*3M0.3M0.4M0.4M0.4M0.4M0.6M2.6M2.6M2.6M2.6M2.4M0.4M0.4M0.4M0.6M2.6M2.6M2.6M2.6M2.4M0.4M0.4M0.4M0.7M0.7M0.7M0.7M0.7M0.5L1.5L1.5L1.5L1.7M0.7M0*7M0.7M0.7M0.5L1.5L1.5L1.5L1.7M0.7M0.7M0.7M0.7M0.
-ceiling: 40x36 cells, 8 access panels, 12 air diffusers, 3 fallen tiles,  reveal 1.6 mm
-traces: 6 switches, 14 outlets, 3 conduits, 16 thresholds
-decals: 34 projectors
-views: spawn (3.60, 0.00, 3.60) yaw 90, longest sight line 9 bays (21.6 m), dark zone bay (5,4), walk test 10 waypoints
-geometry: 147752 verts / 67790 tris / 90 troffers (60 lit)
-lights: 60 area lights (4 casting shadows), culler keeps the nearest 28 within 17 m
-decals: 34 projectors
+=== SceneBuilder (photoreal) 2026/09/04 22:33:39 ===
+=== Level0Replica: 参照画像と同じ構造 ===
+天井高 3.157 m / 視点高 1.345 m / 差 1.812 m
+器具 600 角、1.80 m 格子。垂直画角 40.30 deg
+天井: タイル 3876 枚 (うち器具 380)、T バー 265 区間、壁見切り 32 区間
+塊 7 個 / 器具 380 台 / 60572 頂点 30258 三角形
+カメラ (x=4.533, z=2.400) 高さ 1.345 yaw 36.59 pitch -2.27 fovV 40.30
+lights: 380 area lights (4 casting shadows), culler keeps the nearest 80 within 34 m
+decals: 0 projectors
   set  VisualEnvironment.skyType = 0
   set  Exposure.mode = AutomaticHistogram
   set  Exposure.meteringMode = CenterWeighted
@@ -107,8 +74,8 @@ decals: 34 projectors
   set  ScreenSpaceAmbientOcclusion.rayTracing = True
   set  HDShadowSettings.maxShadowDistance = 45
 volume profile: Assets/_Project/Settings/Level0_Volume.asset
-camera: TAA High, 47deg vFOV, black background
+camera: TAA High, 40.3deg vFOV, black background
 camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on
-player rig built at (3.60, 0.00, 3.60) yaw 90, 9 capture views
+player rig built at (4.53, 0.00, 2.40) yaw 37, 4 capture views
 saved: Assets/_Project/Scenes/Level0.unity
 RESULT: OK
