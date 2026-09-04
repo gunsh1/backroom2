@@ -1,4 +1,4 @@
-=== MaterialBuilder 2026/09/03 21:05:19 ===
+=== MaterialBuilder 2026/09/05 8:33:03 ===
 reimported 51 textures with import rules
 material: M_Wallpaper
   validated: True   keywords: _DETAIL_MAP,_DISABLE_SSR_TRANSPARENT,_MASKMAP,_NORMALMAP,_NORMALMAP_TANGENT_SPACE

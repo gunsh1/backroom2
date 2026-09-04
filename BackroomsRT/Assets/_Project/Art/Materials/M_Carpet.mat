@@ -157,9 +157,9 @@ Material:
     - _CullModeForward: 2
     - _Cutoff: 0.5
     - _DepthOffsetEnable: 0
-    - _DetailAlbedoScale: 0.8
+    - _DetailAlbedoScale: 0.28
     - _DetailNormalScale: 0
-    - _DetailSmoothnessScale: 0.95
+    - _DetailSmoothnessScale: 0.25
     - _DiffusionProfile: 0
     - _DiffusionProfileHash: 0
     - _DisplacementLockObjectScale: 1
@@ -251,8 +251,8 @@ Material:
     - _ZTestTransparent: 4
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.5704816, g: 0.4652678, b: 0.26015112, a: 1}
-    - _Color: {r: 0.57048154, g: 0.46526772, b: 0.2601511, a: 1}
+    - _BaseColor: {r: 0.48591095, g: 0.39576754, b: 0.2224662, a: 1}
+    - _Color: {r: 0.48591095, g: 0.3957675, b: 0.22246614, a: 1}
     - _DiffusionProfileAsset: {r: 0, g: 0, b: 0, a: 0}
     - _DoubleSidedConstants: {r: 1, g: 1, b: -1, a: 0}
     - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}

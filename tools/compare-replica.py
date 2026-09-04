@@ -166,6 +166,65 @@ def main():
     for nm, a_, b_ in rows:
         print('   %-12s %10.4f %10.4f %+10.4f' % (nm, a_, b_, b_-a_))
 
+    # ------------------------------------------------ 3b. 面ごとの明るさ
+    def surf(a):
+        Yl = lum(a)
+        lb, _ = ndimage.label(Yl > 0.80)
+        if lb.max() == 0:
+            return None, None
+        sz = ndimage.sum(np.ones_like(Yl), lb, range(1, lb.max()+1))
+        keep = np.isin(lb, 1+np.nonzero(sz >= 60)[0])
+        ceil = (~keep) & (Yl > 0.30) & (Yl < 0.80)
+        ceil[Yl.shape[0]//2:, :] = False
+        return Yl[keep], Yl[ceil]
+
+    rl, rc = surf(ra)
+    ml, mc = surf(ma)
+    print()
+    print('■ 器具のレンズと天井タイルの明るさ')
+    if rl is None or ml is None:
+        print('   レンズが検出できず')
+    else:
+        print('   %-14s %10s %10s' % ('', '参照', '複製'))
+        print('   %-14s %10.4f %10.4f' % ('レンズ 平均', rl.mean(), ml.mean()))
+        print('   %-14s %9.2f%% %9.2f%%' % ('レンズ 飽和', (rl > 0.995).mean()*100,
+                                            (ml > 0.995).mean()*100))
+        print('   %-14s %10.4f %10.4f' % ('天井タイル', rc.mean(), mc.mean()))
+        print('   %-14s %10.2f %10.2f  段' % ('レンズ/天井',
+                                              np.log2(rl.mean()/rc.mean()),
+                                              np.log2(ml.mean()/mc.mean())))
+
+    # ------------------------------------------------ 3c. 解像感
+    def sharp(a):
+        Yl = lum(a)
+        gy_, gx_ = np.gradient(ndimage.gaussian_filter(Yl, 0.6))
+        return float(np.sqrt(gx_**2 + gy_**2).mean())
+    print()
+    print('■ 解像感 (勾配の平均)')
+    print('   参照 %.5f   複製 %.5f   比 %.2f 倍'
+          % (sharp(ra), sharp(ma), sharp(ma)/max(sharp(ra), 1e-9)))
+
+    # ------------------------------------------------ 3d. 面ごとの明るさ
+    # 構図が揃っているので、同じ画素範囲が同じ面を指す。どの材質が
+    # ずれているかはここでしか分からない。
+    REG = [('右の塊の壁面', 1100, 1280, 300, 420),
+           ('右の塊の幅木', 1100, 1260, 548, 566),
+           ('手前のカーペット', 300, 900, 640, 720),
+           ('天井 (左上)', 200, 600, 30, 120),
+           ('天井 (中央)', 700, 900, 20, 140),
+           ('中景の壁 (左)', 380, 520, 360, 430)]
+    print()
+    print('■ 面ごとの明るさ  (同じ画素範囲 = 同じ面)')
+    print('   %-16s %8s %8s %8s   %s' % ('', '参照', '複製', '差', 'B/R の差'))
+    for nm, x0, x1, y0, y1 in REG:
+        p = ra[y0:y1, x0:x1].reshape(-1, 3)
+        q = ma[y0:y1, x0:x1].reshape(-1, 3)
+        yp = (p @ [.2126, .7152, .0722]).mean()
+        yq = (q @ [.2126, .7152, .0722]).mean()
+        bp = (p[:, 2]/np.maximum(p[:, 0], 1e-6)).mean()
+        bq = (q[:, 2]/np.maximum(q[:, 0], 1e-6)).mean()
+        print('   %-16s %8.3f %8.3f %+8.3f   %+.3f' % (nm, yp, yq, yq-yp, bq-bp))
+
     # ---------------------------------------------- 4. 画像を並べて書き出す
     sbs = Image.new('RGB', (W, H*2+8), (20, 20, 20))
     sbs.paste(ref, (0, 0)); sbs.paste(mine, (0, H+8))

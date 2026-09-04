@@ -34,7 +34,9 @@ namespace Backrooms.EditorTools
             SetTex(wall, "_BaseColorMap", Tex("Wallpaper001B/Wallpaper_Grimed_Color.png"));
             SetTex(wall, "_NormalMap", Tex("Wallpaper001B/Wallpaper001B_NormalGL_Seamed.png"));
             SetTex(wall, "_MaskMap", Tex("Wallpaper001B/Wallpaper_Grimed_MaskMap.png"));
-            SetCol(wall, "_BaseColor", Srgb(0.881f, 0.840f, 0.600f));
+            // 参照と同じ構図で撮って測ると、塊の面が全高で 0.15 暗かった
+            // (参照 0.649 / こちら 0.500)。1.09 倍にしたら +0.078 行き過ぎたので 0.99 倍で戻す。
+            SetCol(wall, "_BaseColor", Srgb(0.870f, 0.829f, 0.593f));
             // 青を 3 回上げたのは、暖色の黒体光源が青を食っていた分の埋め合わせ
             // だった。光源を蛍光灯の実測色にした今、それが二重に効いて壁が
             // 白くなった。参照から逆算して戻す:
@@ -69,7 +71,8 @@ namespace Backrooms.EditorTools
             SetTex(carpet, "_NormalMap", Tex("Carpet011/Carpet011_NormalGL.jpg"));
             SetTex(carpet, "_MaskMap", Tex("Carpet011/Carpet011_MaskMap.png"));
             SetTex(carpet, "_HeightMap", Tex("Carpet011/Carpet011_Displacement.jpg"));
-            SetCol(carpet, "_BaseColor", Srgb(0.78f, 0.712f, 0.547f));
+            // 参照と同じ構図で測ると +0.054 明るかった (参照 0.523 / こちら 0.577)
+            SetCol(carpet, "_BaseColor", Srgb(0.726f, 0.662f, 0.509f));
             // 参照のカーペットは B/R 0.102 / R/G 1.461。Carpet011 の素の色が
             // 既に linear (0.400, 0.344, 0.115) と十分黄色いので、ティントは
             // ほぼ中性にして素材そのものに色を作らせる。
@@ -93,7 +96,10 @@ namespace Backrooms.EditorTools
             SetF(carpet, "_PPDMinSamples", 5f);
             SetF(carpet, "_PPDMaxSamples", 12f);
             SetF(carpet, "_PPDLodThreshold", 5f);
-            Detail(carpet, detail, uvScale: 2.00f, meters: 9f, albedo: 0.80f, smooth: 0.95f);
+            // 9m 周期のディテールを 0.80 の強さで掛けていたので、床に 10m 級の
+            // 淡い斑が出て「濡れた床」に見えていた。低周波の情報自体は要るので
+            // 消さずに、目に付かない強さまで落とす。
+            Detail(carpet, detail, uvScale: 2.00f, meters: 9f, albedo: 0.28f, smooth: 0.25f);
             Save(carpet);
 
             // ------------------------------------------------------ 天井タイル
@@ -117,10 +123,10 @@ namespace Backrooms.EditorTools
                 if (fillNits > 0f) Emissive(c, Srgb(1.00f, 0.974f, 0.735f), nits: fillNits);
                 Save(c);
             }
-            // 補填の 10 nits は「埋めるべき光がある所」にだけ入れる。
+            // 補填の 2 nits は「埋めるべき光がある所」にだけ入れる。
             // 蛍光灯が全部落ちている区画にまで掛けると、真っ暗であるべき部屋の
             // 天井だけが光り続ける。
-            CeilingTile("M_CeilingTile", 10f);
+            CeilingTile("M_CeilingTile", 2f);
             CeilingTile("M_CeilingTileDark", 0f);
 
             // 参照から逆算した実効アルベド linear (0.5255, 0.3633, 0.1702) を保つ。
@@ -149,7 +155,7 @@ namespace Backrooms.EditorTools
             // 補填の無いバーが取り残されて実測でタイルの 1.7 段下 (比 0.31) の
             // 黒い格子になっていた。実物の T バーはタイルの 0.45 段下 (比 0.73)。
             // 補填のうちアルベド比で見合う分を戻す: 10 nits x 0.47 = 5 nits。
-            Emissive(metal, Srgb(1.00f, 0.974f, 0.735f), nits: 6f);   // 5 では 0.60 段 (目標 0.45)
+            Emissive(metal, Srgb(1.00f, 0.974f, 0.735f), nits: 1f);   // タイルの 2 nits にアルベド比で見合う量
             Save(metal);
 
             // 暗黒区画用。補填を外しただけの同じ塗装鋼板。
@@ -161,7 +167,9 @@ namespace Backrooms.EditorTools
 
             // ---------------------------------------------------------- 幅木
             var baseb = Make("M_Baseboard");
-            SetCol(baseb, "_BaseColor", Srgb(0.86f, 0.836f, 0.497f));   // 淡いタンのビニル幅木
+            // 参照と同じ構図で測ると 0.599 に対し 0.473 と暗かった。
+            // ティントを上げられるだけ上げる (それでも -0.08 残る)。
+            SetCol(baseb, "_BaseColor", Srgb(0.95f, 0.923f, 0.549f));   // 淡いタンのビニル幅木
             // 参照の幅木は壁とほとんど見分けがつかない淡いタン。
             // linear 0.342 -> 0.603 (+0.82 段)。残る差は床際の接地 AO なので
             // アルベドで詰められるのはここまで。
@@ -176,7 +184,9 @@ namespace Backrooms.EditorTools
             var on = Make("M_DiffuserOn");
             SetCol(on, "_BaseColor", Srgb(0.05f, 0.05f, 0.05f));
             SetF(on, "_Smoothness", 0.55f);
-            Emissive(on, Srgb(1.00f, 0.974f, 0.735f), nits: 1150f);
+            // 参照と同じ露出で撮ると画面の 2.0% が飛んでいた (参照 0.001%)。
+            // 飛んだ画素は情報が失われるので、記録系では戻せない。
+            Emissive(on, Srgb(1.00f, 0.974f, 0.735f), nits: 700f);
             // 参照の器具は Y=0.971 で白飛びしていない (白飛び率 0.00%)。
             // 1800 nits では露出 +2.2 EV で 2.5% 飛んでいたので落とす。
             Save(on);

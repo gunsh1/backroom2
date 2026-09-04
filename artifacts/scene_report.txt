@@ -1,16 +1,16 @@
-=== SceneBuilder (photoreal) 2026/09/04 22:33:39 ===
+=== SceneBuilder (photoreal) 2026/09/05 8:40:31 ===
 === Level0Replica: 参照画像と同じ構造 ===
 天井高 3.157 m / 視点高 1.345 m / 差 1.812 m
 器具 600 角、1.80 m 格子。垂直画角 40.30 deg
-天井: タイル 3876 枚 (うち器具 380)、T バー 265 区間、壁見切り 32 区間
-塊 7 個 / 器具 380 台 / 60572 頂点 30258 三角形
+天井: タイル 7283 枚 (うち器具 798)、T バー 281 区間、壁見切り 36 区間
+塊 8 個 / 器具 798 台 / 115000 頂点 57468 三角形
 カメラ (x=4.533, z=2.400) 高さ 1.345 yaw 36.59 pitch -2.27 fovV 40.30
-lights: 380 area lights (4 casting shadows), culler keeps the nearest 80 within 34 m
+lights: 798 area lights (4 casting shadows), culler keeps the nearest 500 within 52 m (focus 16 m ahead)
 decals: 0 projectors
   set  VisualEnvironment.skyType = 0
   set  Exposure.mode = AutomaticHistogram
   set  Exposure.meteringMode = CenterWeighted
-  set  Exposure.compensation = 1.98
+  set  Exposure.compensation = 1.58
   set  Exposure.limitMin = -1
   set  Exposure.limitMax = 13.5
   set  Exposure.adaptationSpeedDarkToLight = 2
@@ -69,12 +69,12 @@ decals: 0 projectors
   set  LensDistortion.intensity = -0.08
   set  LensDistortion.scale = 1
   set  MotionBlur.intensity = 0.22
-  set  ScreenSpaceAmbientOcclusion.intensity = 0.75
+  set  ScreenSpaceAmbientOcclusion.intensity = 0.35
   set  ScreenSpaceAmbientOcclusion.radius = 0.45
   set  ScreenSpaceAmbientOcclusion.rayTracing = True
   set  HDShadowSettings.maxShadowDistance = 45
 volume profile: Assets/_Project/Settings/Level0_Volume.asset
-camera: TAA High, 40.3deg vFOV, black background
+camera: TAA High, 出力 40.30deg vFOV / レンダ 40.30deg (overscan 1.000), black background
 camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on
 player rig built at (4.53, 0.00, 2.40) yaw 37, 4 capture views
 saved: Assets/_Project/Scenes/Level0.unity

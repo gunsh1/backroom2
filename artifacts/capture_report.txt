@@ -5,10 +5,10 @@ supportsRayTracing : True
 output             : 1920x1080
 lightmaps          : 0
 shots              : 4 (from CaptureRoute)
-area lights        : 380  max active 80
+area lights        : 798  max active 500
 shot: R1_match  pos=(4.53, 0.00, 2.40) yaw=36.59 pitch=-2.27
 shot: R2_ceiling  pos=(9.00, 0.00, 6.00) yaw=40 pitch=-22
 shot: R3_corner  pos=(9.60, 0.00, 13.80) yaw=78 pitch=0
 shot: R4_corridor  pos=(19.80, 0.00, 21.00) yaw=12 pitch=0
-fps: avg=82.3  worst frame=14.2 ms  (180 frames)   [1920x1080]
+fps: avg=61.9  worst frame=17.9 ms  (180 frames)   [1920x1080]
 walk: reached 2/2 waypoints in 17.6 s, travelled 24.5 m  OK

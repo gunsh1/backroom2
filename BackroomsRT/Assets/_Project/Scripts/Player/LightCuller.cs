@@ -26,6 +26,16 @@ namespace Backrooms.Player
         [Tooltip("この距離だけ動いたら即座に組み替える (m)")]
         public float MoveEpsilon = 0.75f;
 
+        /// <summary>
+        /// 選ぶ基準の点を視線方向へこれだけ前に出す。
+        ///
+        /// 単に「カメラから近い順」で選ぶと、背後の器具まで有効になる一方で
+        /// 見えている奥が全部落ちる。参照画像の中景の壁が実測で参照の半分の
+        /// 明るさ (0.271 対 0.548) になっていたのはこれが原因だった。
+        /// 自発光と RTGI だけでは直接光の代わりにならない。
+        /// </summary>
+        public float LookAhead = 0f;
+
         public float Interval = 0.5f;
 
         Light[] _lights;
@@ -51,7 +61,7 @@ namespace Backrooms.Player
                 if (cam == null) return;
                 _target = cam.transform;
             }
-            var p = _target.position;
+            var p = _target.position + _target.forward * LookAhead;
             bool moved = (p - _lastAt).sqrMagnitude > MoveEpsilon * MoveEpsilon;
             if (!moved && Time.unscaledTime < _next) return;
             _next = Time.unscaledTime + Interval;
@@ -89,7 +99,11 @@ namespace Backrooms.Player
         public void RefreshNow()
         {
             if (_target == null && Camera.main != null) _target = Camera.main.transform;
-            if (_target != null) { _lastAt = _target.position; Refresh(_lastAt); }
+            if (_target != null)
+            {
+                _lastAt = _target.position + _target.forward * LookAhead;
+                Refresh(_lastAt);
+            }
         }
 
         public int Count => _lights == null ? 0 : _lights.Length;

@@ -14,6 +14,17 @@ namespace Backrooms.Capture
         public FlatCaptureRunner.Shot[] Shots;
         /// <summary>ライト間引きを撮影位置で強制更新するときに使う目の高さ。</summary>
         public float EyeHeight = 1.68f;
+        /// <summary>
+        /// 書き出しの直前に掛ける「レンズと記録系」。参照画像から実測した値で、
+        /// 演出ではない。詳しくは CaptureMedium を参照。
+        /// </summary>
+        public float LensK1 = 0f;
+        public float LensOverscan = 1f;
+        public float BlurSigma = 0f;
+        public float Glare = 0f;
+        public float GlareSigma = 0f;
+        public Color MediumGain = Color.white;
+
         public Vector3 FpsProbe;      // fps 計測に使う立ち位置
         public float FpsYaw;
 

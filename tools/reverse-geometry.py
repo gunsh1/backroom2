@@ -110,6 +110,18 @@ for (x0, x1), (lo, hi), bi in TOPS:
     print('   x %4d-%4d : 天井高/視点高 = %.4f' % (x0, x1, dt/db))
 r = float(np.median(rat))
 print('   -> 視点高 %.3f m  天井高 %.3f m' % (hA/r, hA+hA/r))
+print('      ※ この 2 本は当てはまりが悪く (0.57 と 1.12 で 2 倍違う) 採用していない。')
+print('        天井の上端は器具のにじみに埋もれて副画素で追えない。')
+print('        採用値は「壁面が 600mm モジュールに載る」条件から出した')
+print('        視点高 1.345 m / 天井高 3.157 m (差は上の 1.812 m を使う)。')
+# 平面図を引くツールが読む採用値。歪みは採用しない (calibrate-reference.py 参照)
+json.dump(dict(f=float(F), cx=Ww/2.0, cy=Hh/2.0, k1=0.0,
+               pitch=float(np.degrees(np.arctan((CY-Hh/2)/F))), roll=0.0,
+               theta=-36.59, h_above=1.812, light_pitch_m=1.80,
+               W=Ww, H=Hh, fovH=float(2*np.degrees(np.arctan(Ww/2/F))),
+               fovV=float(2*np.degrees(np.arctan(Hh/2/F)))),
+          open('artifacts/replica/calib.json', 'w'), indent=1)
+
 json.dump(dict(f=float(F), cy=float(CY), fovH=float(2*np.degrees(np.arctan(Ww/2/F))),
                pitch_deg=float(np.degrees(np.arctan((CY-Hh/2)/F))),
                wallA=float(ma), wallB=float(mb), h_above=float(hA), ratio=r,

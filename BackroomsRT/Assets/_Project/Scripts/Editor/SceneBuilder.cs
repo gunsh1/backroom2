@@ -33,13 +33,23 @@ namespace Backrooms.EditorTools
         static float _lumens = 3200f;
         static int _maxActiveLights = 28;
         static float _lightRadius = 17f;
+        static float _expComp = 1.98f;      // 自動露出の補正 (EV)
+        static float _lensK1 = 0f;          // 書き出し時に掛ける放射歪み
+        static float _blurSigma = 0f;       // MTF に相当するガウス幅 (px)
+        static float _glare = 0f;           // ベーリンググレアの混合率
+        static float _glareSigma = 0f;
+        static Color _mediumGain = Color.white;
+        static float _lookAhead = 0f;
 
         [MenuItem("Backrooms/3. Build Scene")]
         public static void Build()
         {
             _fovV = 47f; _eyeH = 1.68f;
             _areaSize = new Vector2(1.16f, 0.56f); _lumens = 3200f;
-            _maxActiveLights = 28; _lightRadius = 17f;
+            _maxActiveLights = 28; _lightRadius = 17f; _lookAhead = 0f;
+            _expComp = 1.98f;
+            _lensK1 = 0f; _blurSigma = 0f; _glare = 0f; _glareSigma = 0f;
+            _mediumGain = Color.white;
             BuildWith(null);
         }
 
@@ -59,7 +69,21 @@ namespace Backrooms.EditorTools
             _areaSize = new Vector2(0.556f, 0.556f);
             _lumens = 1600f;
             // 参照は 35m 先まで照らされている。近い 28 台だけでは床が届かない。
-            _maxActiveLights = 80; _lightRadius = 34f;
+            // HDRP の maxAreaLightsOnScreen を 512 に上げた。80 台のときは
+            // 25m より奥の器具が全部落ちて中景の壁が参照の半分の明るさ、
+            // 250 台でも 12m 以遠の床が -0.12 暗かった。参照の床は 30m 先まで
+            // ほぼ一定の明るさなので、直接光がそこまで届いている必要がある。
+            _maxActiveLights = 500; _lightRadius = 52f; _lookAhead = 16f;
+            // 参照より明るかったので下げた。-0.50 EV では中央値が 0.483 (参照 0.515)
+            // まで落ちたので -0.40 EV に戻す。
+            _expComp = 1.98f - 0.40f;
+            // レンズと記録系は CaptureMedium が持つ。値は
+            // tools/fit-capture-medium.py が参照画像から実測したもの。
+            _lensK1 = Level0Replica.LensK1;
+            _blurSigma = Level0Replica.BlurSigma;
+            _glare = Level0Replica.Glare;
+            _glareSigma = Level0Replica.GlareSigma;
+            _mediumGain = Level0Replica.MediumGain;
             BuildWith(Level0Replica.Build);
         }
 
@@ -185,8 +209,10 @@ namespace Backrooms.EditorTools
             var culler = root.AddComponent<LightCuller>();
             culler.MaxActive = _maxActiveLights;
             culler.Radius = _lightRadius;
+            culler.LookAhead = _lookAhead;
             Log.Add($"lights: {made} area lights ({shadowed} casting shadows), "
-                    + $"culler keeps the nearest {culler.MaxActive} within {culler.Radius} m");
+                    + $"culler keeps the nearest {culler.MaxActive} within {culler.Radius} m"
+                    + (culler.LookAhead > 0f ? $" (focus {culler.LookAhead} m ahead)" : ""));
         }
 
         // ------------------------------------------------------------ decals
@@ -245,7 +271,7 @@ namespace Backrooms.EditorTools
             // 参照画像を実測したところ、目測は逆方向に大きく外れていた。
             // 参照の中央値 Y は 0.240、白飛び 0.00%。こちらは 0.468 で
             // 白飛び 2.58% だったので、1 段落とす。
-            Set(exp, "compensation", 1.98f);  // 1.85 では中央値 0.188 (参照 0.240) と下げすぎた
+            Set(exp, "compensation", _expComp);  // 1.85 では中央値 0.188 (参照 0.240) と下げすぎた
             Set(exp, "limitMin", -1.0f);
             Set(exp, "limitMax", 13.5f);
             Set(exp, "adaptationSpeedDarkToLight", 2.0f);
@@ -370,15 +396,20 @@ namespace Backrooms.EditorTools
 
             // --- レンズの歪曲 ---------------------------------------------
             // 24mm 相当なのに直線が完全な直線なのは実在のレンズではありえない。
+            // HDRP の LensDistortion は intensity と実際の歪み量の対応が分からず、
+            // 参照から実測した k1 に合わせられない。複製シーンでは切っておき、
+            // レンズの歪みは CaptureMedium が実測値どおりに掛ける。
             var dist = AddOverride<LensDistortion>(profile);
-            Set(dist, "intensity", -0.08f);   // 樽型をごく僅かに
+            Set(dist, "intensity", _lensK1 != 0f ? 0f : -0.08f);
             Set(dist, "scale", 1.0f);
 
             var mb = AddOverride<MotionBlur>(profile);
             Set(mb, "intensity", 0.22f);
 
             var ao = AddOverride<ScreenSpaceAmbientOcclusion>(profile);
-            Set(ao, "intensity", 0.75f);   // 隅の落ち込みが足りなかった
+            // 参照と同じ構図で測ると、幅木が 0.574 に対し 0.339 まで落ちていた。
+            // 入隅の遮蔽を強く掛けすぎている。
+            Set(ao, "intensity", 0.35f);   // 隅の落ち込みが足りなかった
             Set(ao, "radius", 0.45f);
             Set(ao, "rayTracing", true);      // 効けば RTAO になる
 
@@ -418,7 +449,12 @@ namespace Backrooms.EditorTools
             // 垂直 47 度 = 16:9 で水平 75.4 度、フルサイズ換算 24mm。
             // 実際の室内・建築写真がこの画角で撮られている。これより狭いと
             // 空間の広がりが読めず、これより広いと周辺の引き伸ばしが CG に見える。
-            cam.fieldOfView = _fovV;
+            // 歪みを後から掛ける分、レンダ側の画角を広げておく。広げないと
+            // 画面の隅が「元画像の外」を要求して引き伸ばされる。
+            float over = _lensK1 != 0f
+                ? CaptureMedium.RequiredOverscan(_lensK1, 1920, 1080, _fovV) : 1f;
+            cam.fieldOfView = 2f * Mathf.Atan(Mathf.Tan(_fovV * 0.5f * Mathf.Deg2Rad) * over)
+                              * Mathf.Rad2Deg;
             cam.nearClipPlane = 0.05f;
             cam.farClipPlane = 80f;
             cam.allowHDR = true;
@@ -434,7 +470,7 @@ namespace Backrooms.EditorTools
                 camData.TAAQuality = HDAdditionalCameraData.TAAQualityLevel.High;
                 camData.dithering = true;
                 camData.stopNaNs = true;
-                Log.Add("camera: TAA High, " + cam.fieldOfView + "deg vFOV, black background");
+                Log.Add($"camera: TAA High, 出力 {_fovV:F2}deg vFOV / レンダ {cam.fieldOfView:F2}deg (overscan {over:F3}), black background");
             }
             catch (Exception e) { Log.Add("  camera data setup failed: " + e.Message); }
 
@@ -480,6 +516,12 @@ namespace Backrooms.EditorTools
                 shots.Add(new FlatCaptureRunner.Shot(s.Name, s.Pos, s.Yaw, s.Pitch, s.Light));
             route.Shots = shots.ToArray();
             route.EyeHeight = _eyeH;
+            route.LensK1 = _lensK1;
+            route.LensOverscan = over;
+            route.BlurSigma = _blurSigma;
+            route.Glare = _glare;
+            route.GlareSigma = _glareSigma;
+            route.MediumGain = _mediumGain;
             route.FpsProbe = geo.Spawn;
             route.FpsYaw = geo.SpawnYaw;
             route.Waypoints = geo.Walk.ToArray();

@@ -28,7 +28,10 @@ namespace Backrooms.Capture
         public int Width = 1920;
         public int Height = 1080;
         public int WarmupFrames = 16;
-        public int SettleFrames = 64;    // GI とデノイザ、TAA が落ち着くまで
+        // ヒストグラム自動露出は 64 フレームでは収束しきらず、実行ごとに
+        // 全体の明るさが 0.02 ほど振れていた。参照と数値で比べる以上、
+        // 撮り直して同じ数字が出ないと測定にならない。
+        public int SettleFrames = 220;
         public int FpsFrames = 180;
         public bool QuitWhenDone = true;
 
@@ -106,12 +109,16 @@ namespace Backrooms.Capture
                 if (torch != null) torch.ForceState(s.Light);
                 // 瞬間移動なので、間引きをタイマー任せにすると
                 // 切り替わる前のフレームが撮れる。
-                if (culler != null) culler.Refresh(s.Pos + Vector3.up * eyeH);
+                if (culler != null)
+                {
+                    var fwd = Quaternion.Euler(s.Pitch, s.Yaw, 0f) * Vector3.forward;
+                    culler.Refresh(s.Pos + Vector3.up * eyeH + fwd * culler.LookAhead);
+                }
 
                 // ここで毎フレーム rt に描かれ、履歴が積み上がる
                 for (int i = 0; i < SettleFrames; i++) yield return new WaitForEndOfFrame();
 
-                ReadOut(rt, Path.Combine(OutputDir, s.Name + ".png"));
+                ReadOut(rt, Path.Combine(OutputDir, s.Name + ".png"), route);
                 _log.Add($"shot: {s.Name}  pos={s.Pos} yaw={s.Yaw} pitch={s.Pitch}"
                          + (s.Light ? "  torch=ON" : ""));
                 fps.enabled = true;
@@ -194,8 +201,12 @@ namespace Backrooms.Capture
                      + (stuckAt >= 0 ? $"  STUCK before waypoint {stuckAt} at {fps.transform.position}" : "  OK"));
         }
 
-        /// <summary>蓄積済みの RT をそのまま PNG に書き出す。</summary>
-        void ReadOut(RenderTexture rt, string path)
+        /// <summary>
+        /// 蓄積済みの RT を PNG に書き出す。CaptureRoute にレンズと記録系の
+        /// 値が入っていればそれを掛ける。掛ける前の生の画も _raw.png として
+        /// 残す。媒体の値は生の画から測り直すので、これが無いと較正できない。
+        /// </summary>
+        void ReadOut(RenderTexture rt, string path, CaptureRoute route)
         {
             var prevActive = RenderTexture.active;
             RenderTexture.active = rt;
@@ -204,6 +215,16 @@ namespace Backrooms.Capture
             tex.Apply();
             RenderTexture.active = prevActive;
 
+            bool medium = route != null && (route.LensK1 != 0f || route.BlurSigma > 0f
+                                            || route.Glare > 0f
+                                            || route.MediumGain != Color.white);
+            if (medium)
+            {
+                File.WriteAllBytes(path.Replace(".png", "_raw.png"), tex.EncodeToPNG());
+                CaptureMedium.Apply(tex, route.LensK1, route.LensOverscan,
+                                    route.BlurSigma, route.Glare, route.GlareSigma,
+                                    route.MediumGain);
+            }
             File.WriteAllBytes(path, tex.EncodeToPNG());
             Destroy(tex);
         }
