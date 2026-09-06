@@ -4,6 +4,7 @@
 #   .\tools\backrooms.ps1 materials  マテリアルを作り直す
 #   .\tools\backrooms.ps1 scene      乱数生成のシーンを作り直す
 #   .\tools\backrooms.ps1 replica    参照画像と同じ構造の複製シーンを作る
+#   .\tools\backrooms.ps1 infinite   無限に歩けるシーンを作る（VHS 付き）
 #   .\tools\backrooms.ps1 capture    再生してスクリーンショットと fps を採取（GUI モード）
 #   .\tools\backrooms.ps1 all        materials -> scene -> capture
 #
@@ -60,6 +61,7 @@ switch ($Task) {
     "materials" { Invoke-Unity "Backrooms.EditorTools.MaterialBuilder.BuildAll"    "unity_mat.log"   | Out-Null }
     "scene"     { Invoke-Unity "Backrooms.EditorTools.SceneBuilder.Build"          "unity_scene.log" | Out-Null }
     "replica"   { Invoke-Unity "Backrooms.EditorTools.SceneBuilder.BuildReplicaScene" "unity_replica.log" | Out-Null }
+    "infinite"  { Invoke-Unity "Backrooms.EditorTools.SceneBuilder.BuildInfiniteScene" "unity_infinite.log" | Out-Null }
     "capture"   { Invoke-Unity "Backrooms.EditorTools.CaptureTool.PlayAndCapture"  "unity_capture.log" -Gui | Out-Null }
     "open" {
         Assert-NoEditor
@@ -73,7 +75,7 @@ switch ($Task) {
         Invoke-Unity "Backrooms.EditorTools.SceneBuilder.Build"         "unity_scene.log"   | Out-Null
         Invoke-Unity "Backrooms.EditorTools.CaptureTool.PlayAndCapture" "unity_capture.log" -Gui | Out-Null
     }
-    default { throw "unknown task: $Task  (open|setup|materials|scene|replica|capture|all)" }
+    default { throw "unknown task: $Task  (open|setup|materials|scene|replica|infinite|capture|all)" }
 }
 
 foreach ($r in @("setup_report.txt", "material_report.txt", "scene_report.txt", "capture_report.txt")) {

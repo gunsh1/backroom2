@@ -1,11 +1,9 @@
-=== SceneBuilder (photoreal) 2026/09/05 8:40:31 ===
-=== Level0Replica: 参照画像と同じ構造 ===
-天井高 3.157 m / 視点高 1.345 m / 差 1.812 m
-器具 600 角、1.80 m 格子。垂直画角 40.30 deg
-天井: タイル 7283 枚 (うち器具 798)、T バー 281 区間、壁見切り 36 区間
-塊 8 個 / 器具 798 台 / 115000 頂点 57468 三角形
-カメラ (x=4.533, z=2.400) 高さ 1.345 yaw 36.59 pitch -2.27 fovV 40.30
-lights: 798 area lights (4 casting shadows), culler keeps the nearest 500 within 52 m (focus 16 m ahead)
+=== SceneBuilder (photoreal) 2026/09/06 23:12:28 ===
+=== 無限生成 (ChunkedLevel0) ===
+チャンク 14.4 m 角 / 読み込み半径 3 (43 m) / ライトは半径 2 まで
+スポーン (0.90, 0.00, 0.90) yaw 145  遠景 1 (37.10, 0.00, 25.10)  遠景 2 (-30.90, 0.00, 61.10)
+歩行経路 16 点 / 直線距離 43.5 m
+器具の状態 (6400 ベイの標本): 点灯 69% / 切れ 20% / ちらつき 4% / 器具なし 5%
 decals: 0 projectors
   set  VisualEnvironment.skyType = 0
   set  Exposure.mode = AutomaticHistogram
@@ -54,7 +52,7 @@ decals: 0 projectors
   set  ColorAdjustments.saturation = 0
   set  Bloom.intensity = 0.13
   set  Bloom.scatter = 0.62
-  set  ChromaticAberration.intensity = 0.03
+  set  ChromaticAberration.intensity = 0.01
   set  Vignette.intensity = 0.13
   set  Vignette.smoothness = 0.55
   set  ContactShadows.enable = True
@@ -64,10 +62,23 @@ decals: 0 projectors
   set  ContactShadows.maxDistance = 18
   set  ContactShadows.thicknessScale = 0.15
   set  FilmGrain.type = Thin1
-  set  FilmGrain.intensity = 0.12
+  set  FilmGrain.intensity = 0.04
   set  FilmGrain.response = 0.75
   set  LensDistortion.intensity = -0.08
   set  LensDistortion.scale = 1
+  set  VhsPostProcess.intensity = 0.75
+  set  VhsPostProcess.lines = 486
+  set  VhsPostProcess.lumaBand = 420
+  set  VhsPostProcess.chromaBand = 60
+  set  VhsPostProcess.chroma = 0.85
+  set  VhsPostProcess.desaturate = 0.08
+  set  VhsPostProcess.sharpen = 0.1
+  set  VhsPostProcess.tape = 0.15
+  set  VhsPostProcess.tracking = 0.2
+  set  VhsPostProcess.dropout = 0.1
+  set  VhsPostProcess.headSwitch = 0.25
+  set  VhsPostProcess.scanline = 0.12
+  set  VhsPostProcess.grain = 0.25
   set  MotionBlur.intensity = 0.22
   set  ScreenSpaceAmbientOcclusion.intensity = 0.35
   set  ScreenSpaceAmbientOcclusion.radius = 0.45
@@ -76,6 +87,6 @@ decals: 0 projectors
 volume profile: Assets/_Project/Settings/Level0_Volume.asset
 camera: TAA High, 出力 40.30deg vFOV / レンダ 40.30deg (overscan 1.000), black background
 camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on
-player rig built at (4.53, 0.00, 2.40) yaw 37, 4 capture views
+player rig built at (0.90, 0.00, 0.90) yaw 145, 4 capture views
 saved: Assets/_Project/Scenes/Level0.unity
 RESULT: OK

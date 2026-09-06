@@ -5,10 +5,11 @@ supportsRayTracing : True
 output             : 1920x1080
 lightmaps          : 0
 shots              : 4 (from CaptureRoute)
-area lights        : 798  max active 500
-shot: R1_match  pos=(4.53, 0.00, 2.40) yaw=36.59 pitch=-2.27
-shot: R2_ceiling  pos=(9.00, 0.00, 6.00) yaw=40 pitch=-22
-shot: R3_corner  pos=(9.60, 0.00, 13.80) yaw=78 pitch=0
-shot: R4_corridor  pos=(19.80, 0.00, 21.00) yaw=12 pitch=0
-fps: avg=61.9  worst frame=17.9 ms  (180 frames)   [1920x1080]
-walk: reached 2/2 waypoints in 17.6 s, travelled 24.5 m  OK
+chunks             : 0  (14.4 m each)
+area lights        : 0  max active 300
+shot: I1_spawn  pos=(0.90, 0.00, 0.90) yaw=145 pitch=-2.27
+shot: I2_ceiling  pos=(0.90, 0.00, 0.90) yaw=170 pitch=-26
+shot: I3_far  pos=(37.10, 0.00, 25.10) yaw=325 pitch=-2.27
+shot: I4_farther  pos=(-30.90, 0.00, 61.10) yaw=335 pitch=-2.27
+fps: avg=87.2  worst frame=12.3 ms  (180 frames)   [1920x1080]
+walk: reached 5/15 waypoints in 49.3 s, travelled 68.8 m  STUCK before waypoint 6 at (19.21, 0.08, 29.39)

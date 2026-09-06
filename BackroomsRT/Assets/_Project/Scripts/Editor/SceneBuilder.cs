@@ -10,6 +10,7 @@ using UnityEngine.Rendering.HighDefinition;
 using Backrooms.Capture;
 using Backrooms.Generation;
 using Backrooms.Player;
+using Backrooms.Post;
 
 namespace Backrooms.EditorTools
 {
@@ -40,6 +41,7 @@ namespace Backrooms.EditorTools
         static float _glareSigma = 0f;
         static Color _mediumGain = Color.white;
         static float _lookAhead = 0f;
+        static bool _vhs = false;        // VHS ポストを載せるか
 
         [MenuItem("Backrooms/3. Build Scene")]
         public static void Build()
@@ -50,6 +52,7 @@ namespace Backrooms.EditorTools
             _expComp = 1.98f;
             _lensK1 = 0f; _blurSigma = 0f; _glare = 0f; _glareSigma = 0f;
             _mediumGain = Color.white;
+            _vhs = false;
             BuildWith(null);
         }
 
@@ -84,7 +87,151 @@ namespace Backrooms.EditorTools
             _glare = Level0Replica.Glare;
             _glareSigma = Level0Replica.GlareSigma;
             _mediumGain = Level0Replica.MediumGain;
+            _vhs = false;
             BuildWith(Level0Replica.Build);
+        }
+
+        /// <summary>
+        /// 無限に歩ける Level 0。地形は持たず、Level0Layout の規則から
+        /// プレイヤーの周りだけを ChunkedLevel0 がその場で組み立てる。
+        ///
+        /// 器具は全部が点いているわけではない。参照の Level 0 も、
+        /// 一帯まるごと電気が来ていない区画と、1 台ずつ切れた蛍光灯が混ざっている。
+        /// 最後に VHS を通す。実機のテープが記録できない細部は、そもそも写らない。
+        /// </summary>
+        [MenuItem("Backrooms/3c. Build Infinite Scene")]
+        public static void BuildInfiniteScene()
+        {
+            _fovV = Level0Replica.FovV;
+            _eyeH = Level0Replica.EyeH;
+            _areaSize = new Vector2(0.556f, 0.556f);
+            _lumens = 700f;
+            _maxActiveLights = 300; _lightRadius = 42f; _lookAhead = 12f;
+            _expComp = 1.98f - 0.40f;
+            // 記録系は VHS ポストが持つので、書き出し側の媒体は掛けない
+            _lensK1 = 0f; _blurSigma = 0f; _glare = 0f; _glareSigma = 0f;
+            _mediumGain = Color.white;
+            _vhs = true;
+            EnsureVhsRegistered();
+            BuildWith(InfiniteWorld);
+        }
+
+        /// <summary>
+        /// VHS のカスタムポストを HDRP に登録する。
+        ///
+        /// HDRP はこの一覧を GraphicsSettings.GetRenderPipelineSettings から読む。
+        /// HDRenderPipelineGlobalSettings.asset の旧フィールド
+        /// (m_CustomPostProcessOrdersSettings) を手で書いても参照されない。
+        /// 型名は AssemblyQualifiedName でないと Type.GetType が解決できず、
+        /// 解決できなかった項目は HDRP 側で黙って削除される。
+        ///
+        /// CustomPostProcessOrdersSettings は internal なのでリフレクションで触る。
+        /// </summary>
+        static void EnsureVhsRegistered()
+        {
+            try
+            {
+                var hdAsm = typeof(HDAdditionalCameraData).Assembly;
+                var ordersType = hdAsm.GetType(
+                    "UnityEngine.Rendering.HighDefinition.CustomPostProcessOrdersSettings");
+                if (ordersType == null) { Log.Add("VHS: 設定の型が見つからない"); return; }
+
+                MethodInfo getter = null;
+                foreach (var mi in typeof(GraphicsSettings).GetMethods(
+                             BindingFlags.Public | BindingFlags.Static))
+                    if (mi.Name == "GetRenderPipelineSettings" && mi.IsGenericMethodDefinition
+                        && mi.GetParameters().Length == 0) { getter = mi; break; }
+                if (getter == null) { Log.Add("VHS: GetRenderPipelineSettings が無い"); return; }
+
+                var orders = getter.MakeGenericMethod(ordersType).Invoke(null, null);
+                if (orders == null) { Log.Add("VHS: 設定が取得できない"); return; }
+
+                var prop = ordersType.GetProperty("afterPostProcessCustomPostProcesses", Any);
+                var list = prop?.GetValue(orders);
+                if (list == null) { Log.Add("VHS: After Post Process の一覧が取れない"); return; }
+
+                string tn = typeof(VhsPostProcess).AssemblyQualifiedName;
+                var contains = list.GetType().GetMethod("Contains", new[] { typeof(string) });
+                var add = list.GetType().GetMethod("Add", new[] { typeof(string) });
+                bool has = contains != null && (bool)contains.Invoke(list, new object[] { tn });
+                if (!has && add != null)
+                {
+                    bool ok = (bool)add.Invoke(list, new object[] { tn });
+                    Log.Add("VHS: After Post Process に登録 " + (ok ? "OK" : "失敗") + "  " + tn);
+                }
+                else Log.Add("VHS: すでに登録済み");
+
+                var gs = AssetDatabase.LoadAssetAtPath<ScriptableObject>(
+                    "Assets/Settings/HDRPDefaultResources/HDRenderPipelineGlobalSettings.asset");
+                if (gs != null) { EditorUtility.SetDirty(gs); AssetDatabase.SaveAssets(); }
+            }
+            catch (Exception e) { Log.Add("VHS の登録に失敗: " + e.Message); }
+        }
+
+        static Level0Generator.Result InfiniteWorld(MaterialSet mats)
+        {
+            var res = new Level0Generator.Result();
+            var root = new GameObject("World");
+            res.Root = root;
+
+            var world = root.AddComponent<ChunkedLevel0>();
+            world.Materials = mats;
+            world.Seed = 1996;
+            world.LoadRadius = 3;
+            world.LightRadius = 2;
+            world.Lumens = _lumens;
+            world.AreaSize = _areaSize;
+            world.DiffuserNits = 700f;
+
+            // 器具の間引きはこの root の下に付ける。チャンクが増減するたびに
+            // ChunkedLevel0 が Rebuild を呼ぶ。
+            var culler = root.AddComponent<LightCuller>();
+            culler.MaxActive = _maxActiveLights;
+            culler.Radius = _lightRadius;
+            culler.LookAhead = _lookAhead;
+
+            // 無限に続く以上、立ち位置も向きも自分で解かないと壁を撮ることになる。
+            // 半径 0.9m の円が入る場所を探し、そこから最も遠くまで見通せる向きを選ぶ。
+            var spawn = Level0Layout.FindOpen(new Vector3(2.7f, 0f, 2.7f), world.Seed, 0.9f);
+            res.Spawn = spawn;
+            res.SpawnYaw = Level0Layout.BestYaw(spawn, world.Seed);
+
+            var far1 = Level0Layout.FindOpen(spawn + new Vector3(38f, 0f, 26f), world.Seed, 0.9f);
+            var far2 = Level0Layout.FindOpen(spawn + new Vector3(-30f, 0f, 62f), world.Seed, 0.9f);
+            res.Shots.Add(new Level0Generator.ShotSpec("I1_spawn", spawn, res.SpawnYaw, -2.27f));
+            res.Shots.Add(new Level0Generator.ShotSpec("I2_ceiling", spawn, res.SpawnYaw + 25f, -26f));
+            res.Shots.Add(new Level0Generator.ShotSpec("I3_far", far1, Level0Layout.BestYaw(far1, world.Seed), -2.27f));
+            res.Shots.Add(new Level0Generator.ShotSpec("I4_farther", far2, Level0Layout.BestYaw(far2, world.Seed), -2.27f));
+
+            // 歩行テストの経路は幅優先で解く。直線で結んだ経由点では必ず壁に当たる。
+            var path = Level0Layout.Path(spawn, far1, world.Seed, 0.45f);
+            if (path.Count >= 2) res.Walk.AddRange(path);
+            else { res.Walk.Add(spawn); res.Walk.Add(far1); }
+
+            res.Log.Add("=== 無限生成 (ChunkedLevel0) ===");
+            res.Log.Add($"チャンク {ChunkedLevel0.ChunkSize:F1} m 角 / 読み込み半径 {world.LoadRadius} "
+                        + $"({world.LoadRadius * ChunkedLevel0.ChunkSize:F0} m) / "
+                        + $"ライトは半径 {world.LightRadius} まで");
+            res.Log.Add($"スポーン {spawn} yaw {res.SpawnYaw:F0}  遠景 1 {far1}  遠景 2 {far2}");
+            res.Log.Add($"歩行経路 {res.Walk.Count} 点 / 直線距離 {Vector3.Distance(spawn, far1):F1} m"
+                        + (res.Walk.Count >= 2 ? "" : "  <- 経路が見つからなかった"));
+            int lit = 0, dead = 0, flk = 0, none = 0;
+            for (int i = -40; i < 40; i++)
+                for (int j = -40; j < 40; j++)
+                {
+                    if (!Level0Layout.HasFixture(i, j, world.Seed)) { none++; continue; }
+                    switch (Level0Layout.LampAt(i, j, world.Seed))
+                    {
+                        case Level0Layout.Lamp.Lit: lit++; break;
+                        case Level0Layout.Lamp.Dead: dead++; break;
+                        default: flk++; break;
+                    }
+                }
+            int tot = lit + dead + flk + none;
+            res.Log.Add($"器具の状態 (6400 ベイの標本): 点灯 {lit * 100 / tot}% / "
+                        + $"切れ {dead * 100 / tot}% / ちらつき {flk * 100 / tot}% / "
+                        + $"器具なし {none * 100 / tot}%");
+            return res;
         }
 
         static void BuildWith(Func<MaterialSet, Level0Generator.Result> gen)
@@ -98,7 +245,8 @@ namespace Backrooms.EditorTools
             var geo = gen == null ? Level0Generator.Build(mats) : gen(mats);
             Log.AddRange(geo.Log);
 
-            BuildLights(geo);
+            // 無限生成のシーンは器具を実行時に作るので、ここでは何も置かない
+            if (geo.TrofferCenters.Count > 0) BuildLights(geo);
             BuildDecals(geo);
             BuildVolume();
             BuildPlayer(geo);
@@ -369,7 +517,7 @@ namespace Backrooms.EditorTools
             // 0.055 では天井のスプリンクラーのような小さく明るい物に虹の縁が出て、
             // レンズの性質ではなく描画の破綻に見えていた。実レンズの色収差は
             // 画面周辺でようやく分かる程度。
-            Set(chroma, "intensity", 0.030f);
+            Set(chroma, "intensity", _vhs ? 0.010f : 0.030f);  // VHS 側で色がにじむ
 
             var vig = AddOverride<Vignette>(profile);
             Set(vig, "intensity", 0.13f);     // レンズの周辺光量落ち
@@ -391,7 +539,8 @@ namespace Backrooms.EditorTools
             // ISO 400 程度の控えめな量から始める。
             var grain = AddOverride<FilmGrain>(profile);
             Set(grain, "type", (int)FilmGrainLookup.Thin1);
-            Set(grain, "intensity", 0.12f);
+            // VHS の粒子と二重に乗ると砂嵐になる
+            Set(grain, "intensity", _vhs ? 0.04f : 0.12f);
             Set(grain, "response", 0.75f);
 
             // --- レンズの歪曲 ---------------------------------------------
@@ -402,6 +551,28 @@ namespace Backrooms.EditorTools
             var dist = AddOverride<LensDistortion>(profile);
             Set(dist, "intensity", _lensK1 != 0f ? 0f : -0.08f);
             Set(dist, "scale", 1.0f);
+
+            // --- VHS -----------------------------------------------------
+            // 1996 年のテープが記録できる範囲まで落とす。実機の制約をそのまま
+            // 並べたもので、演出として汚しているのではない。
+            if (_vhs)
+            {
+                var vhs = AddOverride<VhsPostProcess>(profile);
+                // 控えめから始める。掛けすぎると「テープ」ではなく「壊れた描画」に見える。
+                Set(vhs, "intensity", 0.75f);
+                Set(vhs, "lines", 486f);
+                Set(vhs, "lumaBand", 420f);
+                Set(vhs, "chromaBand", 60f);
+                Set(vhs, "chroma", 0.85f);
+                Set(vhs, "desaturate", 0.08f);
+                Set(vhs, "sharpen", 0.10f);
+                Set(vhs, "tape", 0.15f);
+                Set(vhs, "tracking", 0.20f);
+                Set(vhs, "dropout", 0.10f);
+                Set(vhs, "headSwitch", 0.25f);
+                Set(vhs, "scanline", 0.12f);
+                Set(vhs, "grain", 0.25f);
+            }
 
             var mb = AddOverride<MotionBlur>(profile);
             Set(mb, "intensity", 0.22f);
@@ -432,7 +603,13 @@ namespace Backrooms.EditorTools
             var player = new GameObject("Player");
             player.transform.position = geo.Spawn;
             player.transform.rotation = Quaternion.Euler(0f, geo.SpawnYaw, 0f);
-            player.AddComponent<CharacterController>();
+            var cc = player.AddComponent<CharacterController>();
+            // 既定の半径 0.5m では 1.2m の隙間を通れない。人の肩幅は 0.45m 前後。
+            cc.radius = 0.30f;
+            cc.height = 1.78f;
+            cc.center = new Vector3(0f, 0.89f, 0f);
+            cc.slopeLimit = 45f;
+            cc.stepOffset = 0.25f;
             player.AddComponent<FirstPersonController>();
 
             var head = new GameObject("Head");
@@ -484,6 +661,12 @@ namespace Backrooms.EditorTools
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.ScreenSpaceShadows, true);
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.ContactShadows, true);
                 camData.renderingPathCustomFrameSettings.SetEnabled(FrameSettingsField.Decals, true);
+                // これを立てないと Volume に VHS を載せても呼ばれない。
+                // customRenderingSettings を立てた時点で既定値には戻らない。
+                camData.renderingPathCustomFrameSettings.SetEnabled(
+                    FrameSettingsField.CustomPostProcess, true);
+                camData.renderingPathCustomFrameSettings.SetEnabled(
+                    FrameSettingsField.Postprocess, true);
 
                 var mask = camData.renderingPathCustomFrameSettingsOverrideMask;
                 mask.mask[(uint)FrameSettingsField.RayTracing] = true;
@@ -493,6 +676,8 @@ namespace Backrooms.EditorTools
                 mask.mask[(uint)FrameSettingsField.ScreenSpaceShadows] = true;
                 mask.mask[(uint)FrameSettingsField.ContactShadows] = true;
                 mask.mask[(uint)FrameSettingsField.Decals] = true;
+                mask.mask[(uint)FrameSettingsField.CustomPostProcess] = true;
+                mask.mask[(uint)FrameSettingsField.Postprocess] = true;
                 camData.renderingPathCustomFrameSettingsOverrideMask = mask;
                 Log.Add("camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on");
             }

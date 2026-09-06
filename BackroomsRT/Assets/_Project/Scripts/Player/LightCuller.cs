@@ -45,13 +45,26 @@ namespace Backrooms.Player
         Vector3 _lastAt = new Vector3(1e9f, 1e9f, 1e9f);
         float _next;
 
-        void Awake()
+        bool _dirty;
+        float _nextRebuild;
+
+        void Awake() { Collect(); }
+
+        void Collect()
         {
             _lights = GetComponentsInChildren<Light>(true);
             _dist = new float[_lights.Length];
             _order = new int[_lights.Length];
             for (int i = 0; i < _order.Length; i++) _order[i] = i;
+            _lastAt = new Vector3(1e9f, 1e9f, 1e9f);
         }
+
+        /// <summary>
+        /// 器具が増減したときに呼ぶ。無限生成はチャンクを作るたびに
+        /// ライトが増えるので、毎回集め直すと GetComponentsInChildren だけで
+        /// フレームが埋まる。要求は溜めておいて 0.25 秒に 1 度だけ実際に集める。
+        /// </summary>
+        public void Rebuild() { _dirty = true; }
 
         void LateUpdate()
         {
@@ -60,6 +73,12 @@ namespace Backrooms.Player
                 var cam = Camera.main;
                 if (cam == null) return;
                 _target = cam.transform;
+            }
+            if (_dirty && Time.unscaledTime >= _nextRebuild)
+            {
+                _dirty = false;
+                _nextRebuild = Time.unscaledTime + 0.25f;
+                Collect();
             }
             var p = _target.position + _target.forward * LookAhead;
             bool moved = (p - _lastAt).sqrMagnitude > MoveEpsilon * MoveEpsilon;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
+using Backrooms.Generation;
 using Backrooms.Player;
 
 namespace Backrooms.Capture
@@ -69,6 +70,7 @@ namespace Backrooms.Capture
             var torch = FindFirstObjectByType<Flashlight>();
             var culler = FindFirstObjectByType<LightCuller>();
             var route = FindFirstObjectByType<CaptureRoute>();
+            var world = FindFirstObjectByType<ChunkedLevel0>();
             var shots = (route != null && route.Shots != null && route.Shots.Length > 0)
                         ? route.Shots : Fallback;
             if (fps == null || cam == null)
@@ -88,6 +90,9 @@ namespace Backrooms.Capture
             _log.Add("lightmaps          : " + LightmapSettings.lightmaps.Length);
             _log.Add("shots              : " + shots.Length
                      + (route != null ? " (from CaptureRoute)" : " (fallback)"));
+            if (world != null)
+                _log.Add("chunks             : " + world.LoadedChunks
+                         + "  (" + ChunkedLevel0.ChunkSize.ToString("F1") + " m each)");
             _log.Add("area lights        : " + (culler != null ? culler.Count.ToString() : "no culler")
                      + (culler != null ? "  max active " + culler.MaxActive : ""));
 
@@ -113,6 +118,19 @@ namespace Backrooms.Capture
                 {
                     var fwd = Quaternion.Euler(s.Pitch, s.Yaw, 0f) * Vector3.forward;
                     culler.Refresh(s.Pos + Vector3.up * eyeH + fwd * culler.LookAhead);
+                }
+
+                // 無限生成では瞬間移動の直後に周りが存在しない。
+                // 1 フレームに 1 チャンクずつしか作らないので、
+                // 増えなくなるまで待たないと「空中に浮いた絵」が撮れる。
+                if (world != null)
+                {
+                    int last = -1, still = 0;
+                    for (int i = 0; i < 400 && still < 20; i++)
+                    {
+                        yield return new WaitForEndOfFrame();
+                        if (world.LoadedChunks == last) still++; else { still = 0; last = world.LoadedChunks; }
+                    }
                 }
 
                 // ここで毎フレーム rt に描かれ、履歴が積み上がる
@@ -164,6 +182,7 @@ namespace Backrooms.Capture
                 yield break;
             }
             var wp = route.Waypoints;
+            float eyeH = route.EyeHeight;
             fps.SetPose(wp[0], route.FpsYaw, 0f);
             fps.enabled = true;
             fps.UseExternalInput = true;
@@ -175,20 +194,31 @@ namespace Backrooms.Capture
 
             for (int k = 1; k < wp.Length; k++)
             {
-                float deadline = Time.unscaledTime + 12f;
+                float deadline = Time.unscaledTime + 20f;
+                float bestD = float.MaxValue, lastGain = Time.unscaledTime;
                 while (Time.unscaledTime < deadline)
                 {
                     var p = fps.transform.position;
                     var to = wp[k] - p; to.y = 0f;
-                    if (to.magnitude < 0.40f) break;
+                    float dist = to.magnitude;
+                    if (dist < 0.55f) break;
+                    if (dist < bestD - 0.05f) { bestD = dist; lastGain = Time.unscaledTime; }
+
                     fps.SetYaw(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg);
-                    if (culler != null && k % 2 == 0) culler.Refresh(p + Vector3.up * 1.68f);
+                    // 角に引っ掛かったら横に逃がす。まっすぐ押し続けても抜けない。
+                    bool stuck = Time.unscaledTime - lastGain > 1.2f;
+                    fps.ExternalMove = stuck
+                        ? new Vector2(Mathf.Sin(Time.unscaledTime * 3.1f) > 0f ? 1f : -1f, 0.5f)
+                        : new Vector2(0f, 1f);
+
+                    if (culler != null && k % 2 == 0) culler.Refresh(p + Vector3.up * eyeH);
                     yield return null;
                     travelled += Vector3.Distance(new Vector3(p.x, 0f, p.z),
                                                   new Vector3(fps.transform.position.x, 0f, fps.transform.position.z));
                 }
+                fps.ExternalMove = new Vector2(0f, 1f);
                 var d = wp[k] - fps.transform.position; d.y = 0f;
-                if (d.magnitude < 0.40f) reached++;
+                if (d.magnitude < 0.55f) reached++;
                 else { stuckAt = k; break; }
             }
             fps.ExternalMove = Vector2.zero;
