@@ -287,7 +287,7 @@ namespace Backrooms.Generation
                               && open(ci, cj - 1) && open(ci, cj + 1);
                     var kind = inner ? Level0Layout.CeilAt(ci, cj, S) : Level0Layout.Ceil.Tile;
                     if (kind == Level0Layout.Ceil.Missing)
-                    { EmitMissingTile(plenum, tiles, ci, cj, H, S); continue; }
+                    { EmitMissingTile(plenum, ci, cj, H); continue; }
                     if (kind == Level0Layout.Ceil.Hatch)
                     { EmitHatch(fixMesh, ci, cj, H); continue; }
                     if (kind == Level0Layout.Ceil.Vent)
@@ -542,53 +542,20 @@ namespace Backrooms.Generation
         }
 
         /// <summary>
-        /// 抜けたタイル 1 枚。穴の中の天井裏と、床に落ちた本体。
+        /// 抜けたタイル 1 枚。天井に開いた穴だけを作る。
         ///
-        /// 数を出す物ではない。1 枚あるだけで「この階は誰も手入れしていない」
-        /// と分かる。落ちた本体を置かずに穴だけ開けると、天井に四角い黒が
-        /// 描いてあるようにしか見えない。
+        /// 落ちた本体を床に置いていたが、床に白い板が転がっているようにしか
+        /// 見えなかった。天井タイルの実効反射率は業務用カーペット (15-20%)
+        /// の 3 倍あり、しかも床に落ちると器具の光を真上から受ける。
+        /// 実測で床 0.450 に対して本体の明部 0.712 (1.58 倍)、最大 0.806。
+        /// 穴だけのほうが「1 枚無い」ことが素直に読める。
         /// </summary>
-        static void EmitMissingTile(MeshBuilder plenum, MeshBuilder tiles,
-                                    int ci, int cj, float H, int seed)
+        static void EmitMissingTile(MeshBuilder plenum, int ci, int cj, float H)
         {
             const float TW = Level0Builder.TBarW, Cell = Level0Layout.Cell;
             float x0 = ci * Cell + TW * 0.5f, x1 = (ci + 1) * Cell - TW * 0.5f;
             float z0 = cj * Cell + TW * 0.5f, z1 = (cj + 1) * Cell - TW * 0.5f;
             plenum.BoxInside(new Vector3(x0, H, z0), new Vector3(x1, H + 0.42f, z1), 1f);
-
-            // 落ちた本体。位置も向きも座標から決める。乱数を持たせると
-            // 同じ場所に戻ってきたとき別の所に落ちていることになる。
-            float r0 = (Level0Layout.Hash(ci, cj, seed * 7 + 71) & 0xFFFF) / 65535f;
-            float r1 = (Level0Layout.Hash(ci, cj, seed * 7 + 72) & 0xFFFF) / 65535f;
-            float r2 = (Level0Layout.Hash(ci, cj, seed * 7 + 73) & 0xFFFF) / 65535f;
-            int ai = (int)(Level0Layout.Hash(ci, cj, seed * 7 + 74) % 8);
-            int aj = (int)(Level0Layout.Hash(ci, cj, seed * 7 + 75) % 8);
-
-            float cx = (x0 + x1) * 0.5f + (r0 - 0.5f) * 0.9f;
-            float cz = (z0 + z1) * 0.5f + (r1 - 0.5f) * 0.9f;
-            float yaw = r2 * Mathf.PI * 2f;
-            float ca = Mathf.Cos(yaw), sa = Mathf.Sin(yaw);
-            const float h = 0.288f;
-            float u0 = (ai + 0.02f) / 8f, u1 = (ai + 0.98f) / 8f;
-            float v0 = (aj + 0.02f) / 8f, v1 = (aj + 0.98f) / 8f;
-
-            Vector3 C(float sx, float sz, float y)
-                => new Vector3(cx + (sx * h * ca - sz * h * sa), y, cz + (sx * h * sa + sz * h * ca));
-
-            // 天井のタイルは -Y を向くのが正しいが、床に落ちた本体は +Y。
-            // 同じ巻き順で張ると裏返り、上から見ると消えて木口だけが残る。
-            var a = C(-1, -1, 0.016f); var b = C(1, -1, 0.019f);
-            var c = C(1, 1, 0.020f); var d = C(-1, 1, 0.014f);
-            tiles.QuadUv(a, d, c, b,
-                         new Vector2(u0, v0), new Vector2(u0, v1),
-                         new Vector2(u1, v1), new Vector2(u1, v0));
-            var a2 = C(-1, -1, 0f); var b2 = C(1, -1, 0f);
-            var c2 = C(1, 1, 0f); var d2 = C(-1, 1, 0f);
-            var e0 = new Vector2(u0, v0); var e1 = new Vector2(u0 + (u1 - u0) * 0.06f, v0);
-            tiles.QuadUv(a2, b2, b, a, e0, e1, e1, e0);
-            tiles.QuadUv(b2, c2, c, b, e0, e1, e1, e0);
-            tiles.QuadUv(c2, d2, d, c, e0, e1, e1, e0);
-            tiles.QuadUv(d2, a2, a, d, e0, e1, e1, e0);
         }
 
         // ------------------------------------------------------------ ちらつき
