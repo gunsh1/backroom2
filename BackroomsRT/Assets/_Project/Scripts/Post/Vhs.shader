@@ -48,6 +48,11 @@ Shader "Hidden/Backrooms/Vhs"
     float  _Scanline;
     float  _Chroma;         // 色のにじみと遅れ
     float  _Desat;
+    float  _Fisheye;        // 広角レンズの樽型歪み
+    float  _Pillar;         // 4:3 に切り詰めるか
+
+    // テープの縦横比。VHS-C は 4:3 しかない。
+    #define TAPE_ASPECT (4.0 / 3.0)
 
     float Hash21(float2 p)
     {
@@ -93,6 +98,22 @@ Shader "Hidden/Backrooms/Vhs"
         float t = _TimeParameters.x;
         float k = _Intensity;
 
+        // ---- 4:3 に切り詰める ---------------------------------------
+        // テープは 4:3 でしか記録できない。画面がそれより横長なら
+        // 両脇は「映像が無い」ので黒。カメラ側は 4:3 の画角で描いて
+        // あるので、ここで中央の 4:3 の窓に詰め直すと比率が戻る。
+        if (_Pillar > 0.5)
+        {
+            float srcAspect = _ScreenSize.x * _ScreenSize.w;
+            if (srcAspect > TAPE_ASPECT + 0.002)
+            {
+                float f = TAPE_ASPECT / srcAspect;
+                float xw = (uv.x - 0.5) / f + 0.5;
+                if (xw < 0.0 || xw > 1.0) return float4(0.0, 0.0, 0.0, 1.0);
+                uv.x = xw;
+            }
+        }
+
         // ---- 走査線の番号。以降のノイズは全部この単位で起きる ----
         float scan = floor(uv.y * _Lines);
         float lineRnd = Hash21(float2(scan, floor(t * 29.97)));
@@ -116,6 +137,19 @@ Shader "Hidden/Backrooms/Vhs"
             float amt = hs * hs * _HeadSwitch * k;
             duv.x += (Hash21(float2(scan, floor(t * 60.0))) - 0.5) * 0.35 * amt;
             duv.y += 0.004 * amt;
+        }
+
+        // ---- レンズの樽型歪み ---------------------------------------
+        // 家庭用カムコーダの広角端は、まっすぐな線が中央に向かって膨らむ。
+        // 画角そのものは変えず、角がちょうど元の位置に戻るように正規化して
+        // あるので、端に「元画像の外」を要求する穴は空かない。
+        if (_Fisheye > 0.0001)
+        {
+            float2 c = float2((duv.x - 0.5) * TAPE_ASPECT, duv.y - 0.5);
+            const float cornerR2 = TAPE_ASPECT * TAPE_ASPECT * 0.25 + 0.25;
+            float m = (1.0 + _Fisheye * dot(c, c)) / (1.0 + _Fisheye * cornerR2);
+            c *= m;
+            duv = float2(c.x / TAPE_ASPECT + 0.5, c.y + 0.5);
         }
 
         // ---- 輝度の水平帯域 -----------------------------------------

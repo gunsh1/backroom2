@@ -81,6 +81,11 @@ namespace Backrooms.Capture
             }
 
             float eyeH = route != null ? route.EyeHeight : 1.68f;
+            // 記録媒体の縦横比はシーンが決める。VHS は 4:3 しかない。
+            if (route != null && route.Width > 0 && route.Height > 0)
+            {
+                Width = route.Width; Height = route.Height;
+            }
 
             _log.Add("=== capture ===");
             _log.Add("graphicsDeviceType : " + SystemInfo.graphicsDeviceType);

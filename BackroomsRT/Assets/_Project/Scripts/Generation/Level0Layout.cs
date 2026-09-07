@@ -149,14 +149,26 @@ namespace Backrooms.Generation
                 return Unit(i, j, seed * 7 + 42) < 0.55f ? Lamp.Dead : Lamp.Flicker;
 
             float u = Unit(i, j, seed * 7 + 43);
-            if (u < 0.11f) return Lamp.Dead;                       // 1 台ずつの切れ
+            if (u < 0.08f) return Lamp.Dead;                       // 1 台ずつの切れ
             if (u < 0.145f) return Lamp.Flicker;
             return Lamp.Lit;
         }
 
-        /// <summary>器具そのものを置くか。抜けたタイルや点検口の代わりに空きも作る。</summary>
+        /// <summary>
+        /// 器具そのものを置くか。「消えている」のとは意味が違う。
+        ///
+        /// 消えた蛍光灯が等間隔に並んでいる天井と、器具が最初から
+        /// 1 台も無くて格子と吸音タイルだけが続く天井は、別の見え方をする。
+        /// 明暗のムラだけでは前者にしかならないので、ここでも 2 段構えにして
+        /// 「この一帯には照明が入っていない」区画を作る。
+        /// </summary>
         public static bool HasFixture(int i, int j, int seed)
-            => Unit(i, j, seed * 7 + 44) < 0.94f;
+        {
+            const int Zone = 5;                                    // 9m 角
+            if (Unit(FloorDiv(i, Zone), FloorDiv(j, Zone), seed * 7 + 45) < 0.24f)
+                return Unit(i, j, seed * 7 + 46) < 0.15f;          // ぽつんと残った 1 台だけ
+            return Unit(i, j, seed * 7 + 44) < 0.88f;
+        }
 
         // ------------------------------------------------------------ 補助
 

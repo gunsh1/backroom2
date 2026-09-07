@@ -231,6 +231,12 @@ namespace Backrooms.EditorTools
             var off = Make("M_DiffuserOff");
             SetCol(off, "_BaseColor", Srgb(0.60f, 0.598f, 0.575f));
             SetF(off, "_Smoothness", 0.55f);
+            // エリアライトは下向きなので天井を照らさない。天井の明るさは
+            // ほぼタイルの 2 nits の補填で出ている。ここを 0 のままにすると
+            // 切れた器具だけが周りの 8% にしかならず、天井に空いた黒い穴に見える。
+            // 実物のアクリルは半透明で、管が切れていても周りの光を透かす。
+            // タイルの 2 nits に対して 0.5 nits = 1/4。器具として暗いが穴ではない。
+            Emissive(off, Srgb(1.00f, 0.974f, 0.735f), nits: 0.5f);
             Save(off);
 
             AssetDatabase.SaveAssets();

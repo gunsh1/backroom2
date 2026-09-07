@@ -25,6 +25,10 @@ namespace Backrooms.Capture
         public float GlareSigma = 0f;
         public Color MediumGain = Color.white;
 
+        /// <summary>書き出しの画素数。0 なら FlatCaptureRunner の既定 (16:9)。</summary>
+        public int Width = 0;
+        public int Height = 0;
+
         public Vector3 FpsProbe;      // fps 計測に使う立ち位置
         public float FpsYaw;
 

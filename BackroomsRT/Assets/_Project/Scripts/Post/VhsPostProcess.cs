@@ -63,6 +63,12 @@ namespace Backrooms.Post
 
         public ClampedFloatParameter grain = new ClampedFloatParameter(0.5f, 0f, 2f);
 
+        [Tooltip("広角レンズの樽型歪み。0 で直線、大きいほど中央が膨らむ")]
+        public ClampedFloatParameter fisheye = new ClampedFloatParameter(0.28f, 0f, 1.2f);
+
+        [Tooltip("4:3 に切り詰める。横長の画面では両脇が黒くなる")]
+        public BoolParameter pillarbox = new BoolParameter(true);
+
         Material _mat;
 
         public bool IsActive() => _mat != null && intensity.value > 0f;
@@ -99,6 +105,8 @@ namespace Backrooms.Post
             _mat.SetFloat(ID.HeadSwitch, headSwitch.value);
             _mat.SetFloat(ID.Scanline, scanline.value);
             _mat.SetFloat(ID.Grain, grain.value);
+            _mat.SetFloat(ID.Fisheye, fisheye.value * intensity.value);
+            _mat.SetFloat(ID.Pillar, pillarbox.value ? 1f : 0f);
             _mat.SetTexture(ID.MainTex, source);
             HDUtils.DrawFullScreen(cmd, _mat, destination, shaderPassId: 0);
         }
@@ -121,6 +129,8 @@ namespace Backrooms.Post
             public static readonly int HeadSwitch = Shader.PropertyToID("_HeadSwitch");
             public static readonly int Scanline = Shader.PropertyToID("_Scanline");
             public static readonly int Grain = Shader.PropertyToID("_Grain");
+            public static readonly int Fisheye = Shader.PropertyToID("_Fisheye");
+            public static readonly int Pillar = Shader.PropertyToID("_Pillar");
         }
     }
 }

@@ -1,9 +1,9 @@
-=== SceneBuilder (photoreal) 2026/09/06 23:12:28 ===
+=== SceneBuilder (photoreal) 2026/09/07 9:52:28 ===
 === 無限生成 (ChunkedLevel0) ===
-チャンク 14.4 m 角 / 読み込み半径 3 (43 m) / ライトは半径 2 まで
+チャンク 14.4 m 角 / 読み込み半径 4 (58 m) / ライトは半径 2 まで
 スポーン (0.90, 0.00, 0.90) yaw 145  遠景 1 (37.10, 0.00, 25.10)  遠景 2 (-30.90, 0.00, 61.10)
 歩行経路 16 点 / 直線距離 43.5 m
-器具の状態 (6400 ベイの標本): 点灯 69% / 切れ 20% / ちらつき 4% / 器具なし 5%
+器具の状態 (6400 ベイの標本): 点灯 50% / 切れ 14% / ちらつき 4% / 器具なし 30%
 decals: 0 projectors
   set  VisualEnvironment.skyType = 0
   set  Exposure.mode = AutomaticHistogram
@@ -79,13 +79,15 @@ decals: 0 projectors
   set  VhsPostProcess.headSwitch = 0.25
   set  VhsPostProcess.scanline = 0.12
   set  VhsPostProcess.grain = 0.25
+  set  VhsPostProcess.fisheye = 0.4
+  set  VhsPostProcess.pillarbox = True
   set  MotionBlur.intensity = 0.22
   set  ScreenSpaceAmbientOcclusion.intensity = 0.35
   set  ScreenSpaceAmbientOcclusion.radius = 0.45
   set  ScreenSpaceAmbientOcclusion.rayTracing = True
   set  HDShadowSettings.maxShadowDistance = 45
 volume profile: Assets/_Project/Settings/Level0_Volume.asset
-camera: TAA High, 出力 40.30deg vFOV / レンダ 40.30deg (overscan 1.000), black background
+camera: TAA High, 出力 52.17deg vFOV / 水平 66.27deg / 比率 1.333 (1440x1080) / レンダ 52.17deg (overscan 1.000), black background
 camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on
 player rig built at (0.90, 0.00, 0.90) yaw 145, 4 capture views
 saved: Assets/_Project/Scenes/Level0.unity

@@ -42,6 +42,8 @@ namespace Backrooms.EditorTools
         static Color _mediumGain = Color.white;
         static float _lookAhead = 0f;
         static bool _vhs = false;        // VHS ポストを載せるか
+        static float _aspect = 16f / 9f;  // 記録媒体の縦横比
+        static int _outW = 1920, _outH = 1080;
 
         [MenuItem("Backrooms/3. Build Scene")]
         public static void Build()
@@ -52,7 +54,7 @@ namespace Backrooms.EditorTools
             _expComp = 1.98f;
             _lensK1 = 0f; _blurSigma = 0f; _glare = 0f; _glareSigma = 0f;
             _mediumGain = Color.white;
-            _vhs = false;
+            _vhs = false; _aspect = 16f / 9f; _outW = 1920; _outH = 1080;
             BuildWith(null);
         }
 
@@ -87,7 +89,7 @@ namespace Backrooms.EditorTools
             _glare = Level0Replica.Glare;
             _glareSigma = Level0Replica.GlareSigma;
             _mediumGain = Level0Replica.MediumGain;
-            _vhs = false;
+            _vhs = false; _aspect = 16f / 9f; _outW = 1920; _outH = 1080;
             BuildWith(Level0Replica.Build);
         }
 
@@ -102,7 +104,12 @@ namespace Backrooms.EditorTools
         [MenuItem("Backrooms/3c. Build Infinite Scene")]
         public static void BuildInfiniteScene()
         {
-            _fovV = Level0Replica.FovV;
+            // 記録媒体が 4:3 になったので、垂直画角のほうを広げる。
+            // 参照の水平画角 66.26 度を 4:3 で保つと垂直は 52.17 度。
+            // ここで 40.3 度のままにすると、単に両脇を切り落としただけの
+            // 「寄った絵」になり、空間の広がりが読めなくなる。
+            _aspect = 4f / 3f; _outW = 1440; _outH = 1080;
+            _fovV = 52.17f;
             _eyeH = Level0Replica.EyeH;
             _areaSize = new Vector2(0.556f, 0.556f);
             _lumens = 700f;
@@ -177,7 +184,9 @@ namespace Backrooms.EditorTools
             var world = root.AddComponent<ChunkedLevel0>();
             world.Materials = mats;
             world.Seed = 1996;
-            world.LoadRadius = 3;
+            world.LoadRadius = 4;      // 57.6m
+            world.WarmRadius = 4;      // 歩き出す前に全部作っておく
+            world.ChunksPerFrame = 2;
             world.LightRadius = 2;
             world.Lumens = _lumens;
             world.AreaSize = _areaSize;
@@ -572,6 +581,8 @@ namespace Backrooms.EditorTools
                 Set(vhs, "headSwitch", 0.25f);
                 Set(vhs, "scanline", 0.12f);
                 Set(vhs, "grain", 0.25f);
+                Set(vhs, "fisheye", 0.40f);     // 0 -> 0.40 (intensity 込みで 0.30)。中央が 21% 膨らむ
+                Set(vhs, "pillarbox", true);
             }
 
             var mb = AddOverride<MotionBlur>(profile);
@@ -629,13 +640,16 @@ namespace Backrooms.EditorTools
             // 歪みを後から掛ける分、レンダ側の画角を広げておく。広げないと
             // 画面の隅が「元画像の外」を要求して引き伸ばされる。
             float over = _lensK1 != 0f
-                ? CaptureMedium.RequiredOverscan(_lensK1, 1920, 1080, _fovV) : 1f;
+                ? CaptureMedium.RequiredOverscan(_lensK1, _outW, _outH, _fovV) : 1f;
             cam.fieldOfView = 2f * Mathf.Atan(Mathf.Tan(_fovV * 0.5f * Mathf.Deg2Rad) * over)
                               * Mathf.Rad2Deg;
             cam.nearClipPlane = 0.05f;
             cam.farClipPlane = 80f;
             cam.allowHDR = true;
             camGo.tag = "MainCamera";
+            // 描画先が何であれ 4:3 で描く。ウィンドウ比率のままだと
+            // VHS 側で 4:3 の窓に詰め直したときに縦長に潰れる。
+            camGo.AddComponent<FixedAspect>().Aspect = _aspect;
             var camData = camGo.AddComponent<HDAdditionalCameraData>();
 
             try
@@ -647,7 +661,10 @@ namespace Backrooms.EditorTools
                 camData.TAAQuality = HDAdditionalCameraData.TAAQualityLevel.High;
                 camData.dithering = true;
                 camData.stopNaNs = true;
-                Log.Add($"camera: TAA High, 出力 {_fovV:F2}deg vFOV / レンダ {cam.fieldOfView:F2}deg (overscan {over:F3}), black background");
+                float hfov = 2f * Mathf.Atan(Mathf.Tan(_fovV * 0.5f * Mathf.Deg2Rad) * _aspect) * Mathf.Rad2Deg;
+                Log.Add($"camera: TAA High, 出力 {_fovV:F2}deg vFOV / 水平 {hfov:F2}deg / "
+                        + $"比率 {_aspect:F3} ({_outW}x{_outH}) / レンダ {cam.fieldOfView:F2}deg "
+                        + $"(overscan {over:F3}), black background");
             }
             catch (Exception e) { Log.Add("  camera data setup failed: " + e.Message); }
 
@@ -707,6 +724,7 @@ namespace Backrooms.EditorTools
             route.Glare = _glare;
             route.GlareSigma = _glareSigma;
             route.MediumGain = _mediumGain;
+            route.Width = _outW; route.Height = _outH;
             route.FpsProbe = geo.Spawn;
             route.FpsYaw = geo.SpawnYaw;
             route.Waypoints = geo.Walk.ToArray();

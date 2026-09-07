@@ -2,7 +2,7 @@
 graphicsDeviceType : Direct3D12
 graphicsDeviceName : NVIDIA GeForce RTX 3060
 supportsRayTracing : True
-output             : 1920x1080
+output             : 1440x1080
 lightmaps          : 0
 shots              : 4 (from CaptureRoute)
 chunks             : 0  (14.4 m each)
@@ -11,5 +11,5 @@ shot: I1_spawn  pos=(0.90, 0.00, 0.90) yaw=145 pitch=-2.27
 shot: I2_ceiling  pos=(0.90, 0.00, 0.90) yaw=170 pitch=-26
 shot: I3_far  pos=(37.10, 0.00, 25.10) yaw=325 pitch=-2.27
 shot: I4_farther  pos=(-30.90, 0.00, 61.10) yaw=335 pitch=-2.27
-fps: avg=87.2  worst frame=12.3 ms  (180 frames)   [1920x1080]
+fps: avg=104.4  worst frame=10.2 ms  (180 frames)   [1440x1080]
 walk: reached 5/15 waypoints in 49.3 s, travelled 68.8 m  STUCK before waypoint 6 at (19.21, 0.08, 29.39)

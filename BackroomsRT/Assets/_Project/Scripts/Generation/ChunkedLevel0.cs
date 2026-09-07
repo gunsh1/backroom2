@@ -31,7 +31,11 @@ namespace Backrooms.Generation
         [Header("生成")]
         public int Seed = 1996;
         [Tooltip("この距離のチャンクまで実体を作る")]
-        public int LoadRadius = 3;
+        public int LoadRadius = 4;
+        [Tooltip("開始時にここまでは同期で作ってしまう。歩き出す前に読み込みを終わらせる")]
+        public int WarmRadius = 4;
+        [Tooltip("1 フレームに作るチャンク数。増やすと繋ぎ目が見えにくくなる代わりに引っ掛かる")]
+        public int ChunksPerFrame = 2;
         [Tooltip("この距離のチャンクにだけ実際のライトを置く。外は自発光だけ")]
         public int LightRadius = 2;
         public Transform Viewer;
@@ -73,11 +77,15 @@ namespace Backrooms.Generation
         void Start()
         {
             if (Viewer == null && Camera.main != null) Viewer = Camera.main.transform;
-            // 最初の 1 リングだけは同期で作る。床が無いとプレイヤーが落ちる。
+            // 開始時は読み込み半径ぶんをまとめて同期で作る。
+            // 1 リングだけにすると床が無くて落ちることは防げるが、歩き出した
+            // 直後に手前で世界が組み上がっていくのが見えてしまう。ここは
+            // 「読み込み」なので止まってよい場所で、走ってから止まるより良い。
             var c = ChunkOf(Viewer != null ? Viewer.position : Vector3.zero);
-            for (int dx = -1; dx <= 1; dx++)
-                for (int dz = -1; dz <= 1; dz++)
-                    Ensure(c.x + dx, c.y + dz);
+            int wr = Mathf.Max(1, Mathf.Min(WarmRadius, LoadRadius));
+            for (int dx = -wr; dx <= wr; dx++)
+                for (int dz = -wr; dz <= wr; dz++)
+                    if (dx * dx + dz * dz <= wr * wr) Ensure(c.x + dx, c.y + dz);
             if (_culler != null) _culler.Rebuild();
             StartCoroutine(Stream());
         }
@@ -98,23 +106,26 @@ namespace Backrooms.Generation
                     Retire(c);
                 }
 
-                // 近い順に 1 つずつ。作った直後は必ず 1 フレーム返す。
-                Vector2Int? next = null;
-                int best = int.MaxValue;
-                for (int dx = -LoadRadius; dx <= LoadRadius; dx++)
-                    for (int dz = -LoadRadius; dz <= LoadRadius; dz++)
-                    {
-                        int d = dx * dx + dz * dz;
-                        if (d > LoadRadius * LoadRadius || d >= best) continue;
-                        var k = new Vector2Int(c.x + dx, c.y + dz);
-                        if (_live.ContainsKey(Key(k.x, k.y))) continue;
-                        best = d; next = k;
-                    }
-                if (next.HasValue)
+                // 近い順に。1 フレームあたりの数だけ作ったら必ず返す。
+                bool made = false;
+                for (int n = 0; n < Mathf.Max(1, ChunksPerFrame); n++)
                 {
+                    Vector2Int? next = null;
+                    int best = int.MaxValue;
+                    for (int dx = -LoadRadius; dx <= LoadRadius; dx++)
+                        for (int dz = -LoadRadius; dz <= LoadRadius; dz++)
+                        {
+                            int d = dx * dx + dz * dz;
+                            if (d > LoadRadius * LoadRadius || d >= best) continue;
+                            var k = new Vector2Int(c.x + dx, c.y + dz);
+                            if (_live.ContainsKey(Key(k.x, k.y))) continue;
+                            best = d; next = k;
+                        }
+                    if (!next.HasValue) break;
                     Ensure(next.Value.x, next.Value.y);
-                    if (_culler != null) _culler.Rebuild();
+                    made = true;
                 }
+                if (made && _culler != null) _culler.Rebuild();
                 yield return wait;
             }
         }
