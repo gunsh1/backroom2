@@ -1,4 +1,4 @@
-=== SceneBuilder (photoreal) 2026/09/07 13:31:30 ===
+=== SceneBuilder (photoreal) 2026/09/07 14:23:56 ===
 遠くの声: female 7 本 / 平均 120 秒に 1 回 / 距離 18-34m
 === 無限生成 (ChunkedLevel0) ===
 チャンク 14.4 m 角 / 読み込み半径 4 (58 m) / ライトは半径 3 まで
@@ -94,6 +94,7 @@ decals: 0 projectors
 volume profile: Assets/_Project/Settings/Level0_Volume.asset
 footsteps: 実録音 Step_Carpet.wav を使用 (0.254s)
 呼び声: male 2 本 (E キー)
+呼吸: Breath_Normal.wav (14.3s ループ) / 走り 14 秒で速度 1.20 倍 / 戻り 35 秒
 camera: TAA High, 出力 52.17deg vFOV / 水平 66.27deg / 比率 1.333 (1440x1080) / レンダ 52.17deg (overscan 1.000), black background
 camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on
 player rig built at (0.90, 0.00, 0.90) yaw 145, 6 capture views

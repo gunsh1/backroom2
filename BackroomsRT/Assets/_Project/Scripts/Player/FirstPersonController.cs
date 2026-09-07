@@ -61,6 +61,8 @@ namespace Backrooms.Player
         /// </summary>
         [System.NonSerialized] public bool UseExternalInput;
         [System.NonSerialized] public Vector2 ExternalMove;
+        /// <summary>差し込み入力での走り。息の上がり方はここでしか試せない。</summary>
+        [System.NonSerialized] public bool ExternalSprint;
 
         CharacterController _cc;
         Vector3 _velocity;
@@ -159,9 +161,10 @@ namespace Backrooms.Player
         void HandleMove()
         {
             Vector2 input = ExternalMove;
-            bool sprintHeld = false;
+            bool sprintHeld = ExternalSprint;
             if (!UseExternalInput)
             {
+                sprintHeld = false;
                 input = Vector2.zero;
                 if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) input.y += 1f;
                 if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) input.y -= 1f;

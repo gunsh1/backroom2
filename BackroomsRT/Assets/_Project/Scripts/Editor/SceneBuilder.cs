@@ -788,6 +788,20 @@ namespace Backrooms.EditorTools
                 var shout = player.AddComponent<Shout>();
                 shout.Clips = LoadVoices("male_");
                 Log.Add($"呼び声: male {shout.Clips.Length} 本 ({shout.Key} キー)");
+
+                // 撮っている人の呼吸。常時。走ると上がって、ゆっくり戻る。
+                const string breathPath = "Assets/_Project/Audio/Breath_Normal.wav";
+                AssetDatabase.ImportAsset(breathPath, ImportAssetOptions.ForceUpdate);
+                var br = AssetDatabase.LoadAssetAtPath<AudioClip>(breathPath);
+                if (br != null)
+                {
+                    var breath = player.AddComponent<Breathing>();
+                    breath.Clip = br;
+                    Log.Add($"呼吸: Breath_Normal.wav ({br.length:F1}s ループ) / "
+                            + $"走り {breath.RiseSeconds:F0} 秒で速度 {breath.MaxPitch:F2} 倍 / "
+                            + $"戻り {breath.FallSeconds:F0} 秒");
+                }
+                else Log.Add("呼吸: Breath_Normal.wav が無い");
             }
 
             var camGo = new GameObject("MainCamera");

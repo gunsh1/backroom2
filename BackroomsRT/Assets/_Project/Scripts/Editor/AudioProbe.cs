@@ -128,6 +128,11 @@ namespace Backrooms.EditorTools
                 if (female.Count > 0)
                     VoiceRow(dir, s, "voice_far", "遠くの声", female[0],
                              Mix.VoiceFarDirect * 0.25f, Mix.VoiceFarSend, 430f, log);
+
+                var breath = AssetDatabase.LoadAssetAtPath<AudioClip>(
+                    "Assets/_Project/Audio/Breath_Normal.wav");
+                if (breath != null) BreathDemo(dir, s, breath, log);
+                else log.AppendLine("呼吸: Breath_Normal.wav が無い");
             }
 
             log.AppendLine("ir_*.wav は残響のみ (直接音なし)。RT60 を測る用。");
@@ -310,6 +315,100 @@ namespace Backrooms.EditorTools
                 "{0,-12} {1,-24} {2,7:F4} {3,7:F4} {4,8:F1}dB {5,8:F3} {6,8:F4}",
                 label, Path.GetFileNameWithoutExtension(
                     UnityEditor.AssetDatabase.GetAssetPath(clip)), dPk, wPk, ratio, oPk, oRms));
+        }
+
+        /// <summary>
+        /// 呼吸を 30 秒ぶん通す。平常 -> 走って上がる -> 収まる。
+        /// 実行時と同じ規則 (直線で上げ下げ、上がるより戻りが遅い) で
+        /// 再生速度を動かす。耳で確かめられる形にしておかないと、
+        /// 「速くなった」かどうかは数字では分からない。
+        /// </summary>
+        static void BreathDemo(string dir, Spot s, AudioClip clip, StringBuilder log)
+        {
+            const float Rise = 14f, Fall = 35f, MaxPitch = 1.20f, Loud = 1.8f;
+            const float RunFrom = 8f, RunTo = 24f;
+            var data = ClipData(clip);
+            int len = Fs * 30;
+            var dry = new float[len];
+
+            double idx = 0;
+            float pkPitch = 1f, endPitch = 1f;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)Fs;
+                float effort = t < RunFrom ? 0f
+                             : t < RunTo ? Mathf.Clamp01((t - RunFrom) / Rise)
+                             : Mathf.Clamp01((RunTo - RunFrom) / Rise - (t - RunTo) / Fall);
+                float pitch = Mathf.Lerp(1f, MaxPitch, effort);
+                if (pitch > pkPitch) pkPitch = pitch;
+                endPitch = pitch;
+
+                int i0 = (int)idx;
+                float f = (float)(idx - i0);
+                float a = data[i0 % data.Length], b = data[(i0 + 1) % data.Length];
+                dry[i] = (a * (1f - f) + b * f) * Mix.Breath * Mathf.Lerp(1f, Loud, effort);
+                idx += pitch;
+                if (idx >= data.Length) idx -= data.Length;
+            }
+            // 床を混ぜる前の呼吸だけも出しておく。混ぜたあとでは、息が
+            // 上がったときに音量が 1.8 倍になる分へ重心が引きずられて、
+            // 「再生速度が上がった」ことを測って取り出せない。
+            Wav.Write(Path.Combine(dir, "demo_breath_dry.wav"), (float[])dry.Clone(), 1, Fs);
+
+            // 部屋の床。呼吸だけ聞いても大きさの見当が付かない。
+            var hum = ClipData(SoundBank.Ballast);
+            var tone = ClipData(SoundBank.RoomTone);
+            var hvac = ClipData(SoundBank.Hvac);
+            float bRms = 0f;
+            for (int i = 0; i < len; i++) bRms += dry[i] * dry[i];
+            bRms = Mathf.Sqrt(bRms / len);
+            float bedRms = 0f;
+            for (int i = 0; i < len; i++)
+            {
+                float bed = hum[i % hum.Length] * Mix.Ballast + tone[i % tone.Length] * Mix.Tone
+                          + hvac[i % hvac.Length] * Mix.Hvac;
+                bedRms += bed * bed;
+                dry[i] += bed;
+            }
+            bedRms = Mathf.Sqrt(bedRms / len);
+
+            var buf = RunRoom(s, dry, null);
+            Wav.Write(Path.Combine(dir, "demo_breath.wav"), buf, 2, Fs);
+            log.AppendLine(string.Format(
+                "呼吸: {0:F1}s ループ / 走り {1:F0}s で速度 {2:F2} 倍 / 30s 時点で {3:F2} 倍  "
+                + "呼吸 rms {4:F4} / 部屋の床 rms {5:F4} = {6:+0.0;-0.0}dB",
+                clip.length, Rise, pkPitch, endPitch, bRms, bedRms,
+                20f * Mathf.Log10(bRms / Mathf.Max(bedRms, 1e-9f))));
+        }
+
+        /// <summary>乾いた音の並びを部屋に通してテープまで掛ける。送りは任意。</summary>
+        static float[] RunRoom(Spot s, float[] dry, float[] send)
+        {
+            var fdn = new Fdn(Fs);
+            var early = new Early(Fs);
+            fdn.SetDecay(s.Est.Rt60, s.Est.HfRatio);
+            var sec = new float[Early.MaxTaps];
+            var gain = new float[Early.MaxTaps];
+            var pan = new float[Early.MaxTaps];
+            int n = RoomAcoustics.BuildTaps(s.Est, Vector3.forward, sec, gain, pan, Level0Layout.EyeH);
+            early.SetTaps(sec, gain, pan, n);
+
+            int len = dry.Length;
+            var buf = new float[len * 2];
+            float w = s.Est.Wet;
+            for (int i = 0; i < len; i++)
+            {
+                float x = dry[i];
+                float rev = send != null ? x + send[i] : x;
+                float el, er, rl, rr;
+                early.Process(rev, out el, out er);
+                fdn.Process(rev, out rl, out rr);
+                buf[i * 2] = x + (el + rl) * w;
+                buf[i * 2 + 1] = x + (er + rr) * w;
+            }
+            var tp = new Tape(Fs) { Amount = 0.7f };
+            tp.Process(buf, 2);
+            return buf;
         }
 
         /// <summary>

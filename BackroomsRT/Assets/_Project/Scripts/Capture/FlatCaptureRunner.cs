@@ -222,7 +222,46 @@ namespace Backrooms.Capture
                               + (dv.LastOccluded ? "壁の向こう" : "見通せる")
                             : ""));
             }
+            yield return BreathTest(fps);
             Finish();
+        }
+
+        /// <summary>
+        /// 走って息が上がり、やめて収まるところまでを実際に動かして測る。
+        /// 「走ると速くなる」は数字にしないと直ったかどうか分からない。
+        /// </summary>
+        IEnumerator BreathTest(FirstPersonController fps)
+        {
+            var br = FindFirstObjectByType<Breathing>();
+            if (br == null || fps == null) yield break;
+
+            var rows = new System.Text.StringBuilder();
+            fps.enabled = true;
+            fps.UseExternalInput = true;
+            fps.ExternalMove = new Vector2(0f, 1f);
+
+            float t0 = Time.unscaledTime, next = 0f;
+            const float Run = 16f, Rest = 20f;
+            while (Time.unscaledTime - t0 < Run + Rest)
+            {
+                float t = Time.unscaledTime - t0;
+                fps.ExternalSprint = t < Run;
+                if (t >= next)
+                {
+                    rows.Append($"{t:F0}s {br.Pitch:F3}  ");
+                    next += 4f;
+                }
+                yield return null;
+            }
+            fps.ExternalSprint = false;
+            fps.ExternalMove = Vector2.zero;
+            fps.UseExternalInput = false;
+            fps.enabled = false;
+
+            _log.Add($"breath: 走り {Run:F0}s -> 休み {Rest:F0}s の再生速度");
+            _log.Add("  " + rows.ToString().TrimEnd());
+            _log.Add($"  上がりきり {br.MaxPitch:F2} 倍 (走り {br.RiseSeconds:F0}s) / "
+                     + $"戻り {br.FallSeconds:F0}s / 終了時 {br.Effort:F2}");
         }
 
         /// <summary>
