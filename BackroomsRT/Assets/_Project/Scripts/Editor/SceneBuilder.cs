@@ -215,6 +215,13 @@ namespace Backrooms.EditorTools
                 root.AddComponent<AmbientBed>();
                 var fv = root.AddComponent<FixtureVoices>();
                 fv.Seed = world.Seed;
+
+                // 遠くの誰かの声。平均 2 分に 1 回。
+                var dv = root.AddComponent<DistantVoice>();
+                dv.Seed = world.Seed;
+                dv.Clips = LoadVoices("female_");
+                res.Log.Add($"遠くの声: female {dv.Clips.Length} 本 / 平均 {dv.MeanInterval:F0} 秒に 1 回 / "
+                            + $"距離 {dv.Distance.x:F0}-{dv.Distance.y:F0}m");
             }
 
             // 無限に続く以上、立ち位置も向きも自分で解かないと壁を撮ることになる。
@@ -363,6 +370,35 @@ namespace Backrooms.EditorTools
             AssetDatabase.SaveAssets();
             Log.Add("RESULT: OK");
             Report();
+        }
+
+        /// <summary>
+        /// Audio/Voices から接頭辞で拾う。male_ と female_ で分ける。
+        /// 数を増やしたければ同じ規則で並べるだけでよく、コードは触らない。
+        /// (female_ は male を含むので、Contains ではなく前方一致で見ること)
+        /// </summary>
+        static AudioClip[] LoadVoices(string prefix)
+        {
+            const string dir = "Assets/_Project/Audio/Voices";
+            var list = new List<AudioClip>();
+            if (AssetDatabase.IsValidFolder(dir))
+            {
+                var paths = new List<string>();
+                foreach (var g in AssetDatabase.FindAssets("t:AudioClip", new[] { dir }))
+                    paths.Add(AssetDatabase.GUIDToAssetPath(g));
+                paths.Sort(StringComparer.Ordinal);
+                foreach (var p in paths)
+                {
+                    if (!Path.GetFileName(p).StartsWith(prefix, StringComparison.Ordinal)) continue;
+                    // AudioImportRules を後から足したので、既存の素材は取り込み直さないと
+                    // 古い設定 (圧縮のままメモリに置く) が残る。
+                    AssetDatabase.ImportAsset(p, ImportAssetOptions.ForceUpdate);
+                    var c = AssetDatabase.LoadAssetAtPath<AudioClip>(p);
+                    if (c != null) list.Add(c);
+                }
+            }
+            if (list.Count == 0) Log.Add("  声の素材が見つからない: " + dir + "/" + prefix + "*");
+            return list.ToArray();
         }
 
         // --------------------------------------------------------- materials
@@ -737,8 +773,9 @@ namespace Backrooms.EditorTools
             {
                 var steps = player.AddComponent<Footsteps>();
                 // 実録音があれば合成より優先する。
-                var rec = AssetDatabase.LoadAssetAtPath<AudioClip>(
-                    "Assets/_Project/Audio/Step_Carpet.wav");
+                const string stepPath = "Assets/_Project/Audio/Step_Carpet.wav";
+                AssetDatabase.ImportAsset(stepPath, ImportAssetOptions.ForceUpdate);
+                var rec = AssetDatabase.LoadAssetAtPath<AudioClip>(stepPath);
                 if (rec != null)
                 {
                     steps.Clips = new[] { rec };
@@ -746,6 +783,11 @@ namespace Backrooms.EditorTools
                             + rec.length.ToString("F3") + "s)");
                 }
                 else Log.Add("footsteps: 実録音が見つからないので合成に落ちる");
+
+                // E で呼ぶ。自分の声。
+                var shout = player.AddComponent<Shout>();
+                shout.Clips = LoadVoices("male_");
+                Log.Add($"呼び声: male {shout.Clips.Length} 本 ({shout.Key} キー)");
             }
 
             var camGo = new GameObject("MainCamera");

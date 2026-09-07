@@ -110,6 +110,26 @@ namespace Backrooms.EditorTools
                 log.AppendLine("tape_dry / tape_wet は平坦な雑音の前後。テープの帯域を測る用。");
             }
 
+            // ---- 声 -------------------------------------------------------
+            // 呼び声 (自分) と遠くの声を、実行時と同じ構造で部屋に通す。
+            // 遠い声は「直接音がほとんど無く、残響だけが返ってくる」ことが
+            // 全てなので、直接音と残響の比を数字で出しておく。
+            {
+                var s = spots.Count > 1 ? spots[1] : spots[0];
+                var male = LoadVoices("male_");
+                var female = LoadVoices("female_");
+                log.AppendLine();
+                log.AppendLine($"声の素材: male {male.Count} 本 / female {female.Count} 本  "
+                               + $"(部屋 = {s.Name})");
+                log.AppendLine("種類          素材                     直接音   残響   残響/直接  出力peak 出力rms");
+                if (male.Count > 0)
+                    VoiceRow(dir, s, "shout", "呼び声(自分)", male[0],
+                             Mix.Shout, Mix.ShoutSend, 0f, log);
+                if (female.Count > 0)
+                    VoiceRow(dir, s, "voice_far", "遠くの声", female[0],
+                             Mix.VoiceFarDirect * 0.25f, Mix.VoiceFarSend, 430f, log);
+            }
+
             log.AppendLine("ir_*.wav は残響のみ (直接音なし)。RT60 を測る用。");
             log.AppendLine("demo_*.wav は足音を部屋に通してテープまで掛けたもの。");
 
@@ -255,6 +275,106 @@ namespace Backrooms.EditorTools
             }
             var tp = new Tape(Fs); tp.Amount = 0.7f;
             tp.Process(buf, 2);
+            return buf;
+        }
+
+        // ------------------------------------------------------------ 声
+
+        static List<AudioClip> LoadVoices(string prefix)
+        {
+            var list = new List<AudioClip>();
+            const string dir = "Assets/_Project/Audio/Voices";
+            if (!UnityEditor.AssetDatabase.IsValidFolder(dir)) return list;
+            var paths = new List<string>();
+            foreach (var g in UnityEditor.AssetDatabase.FindAssets("t:AudioClip", new[] { dir }))
+                paths.Add(UnityEditor.AssetDatabase.GUIDToAssetPath(g));
+            paths.Sort(StringComparer.Ordinal);
+            foreach (var p in paths)
+            {
+                if (!Path.GetFileName(p).StartsWith(prefix, StringComparison.Ordinal)) continue;
+                var c = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(p);
+                if (c != null) list.Add(c);
+            }
+            return list;
+        }
+
+        static void VoiceRow(string dir, Spot s, string key, string label, AudioClip clip,
+                             float direct, float send, float lpHz, StringBuilder log)
+        {
+            float dPk, wPk, oPk, oRms;
+            var buf = RenderVoice(s, ClipData(clip), direct, send, lpHz,
+                                  out dPk, out wPk, out oPk, out oRms);
+            Wav.Write(Path.Combine(dir, "demo_" + key + ".wav"), buf, 2, Fs);
+            float ratio = dPk > 1e-6f ? 20f * Mathf.Log10(wPk / dPk) : 99f;
+            log.AppendLine(string.Format(
+                "{0,-12} {1,-24} {2,7:F4} {3,7:F4} {4,8:F1}dB {5,8:F3} {6,8:F4}",
+                label, Path.GetFileNameWithoutExtension(
+                    UnityEditor.AssetDatabase.GetAssetPath(clip)), dPk, wPk, ratio, oPk, oRms));
+        }
+
+        /// <summary>
+        /// 声を部屋に通す。直接音と「残響にだけ送る分」を別々に持たせるのは
+        /// 実行時 (ReverbSend + ListenerDsp) と同じ構造。遠さは音量ではなく
+        /// この 2 つの比で決まるので、比を測れる形で組む。
+        /// </summary>
+        static float[] RenderVoice(Spot s, float[] clip, float direct, float send, float lpHz,
+                                   out float dPeak, out float wPeak,
+                                   out float outPeak, out float outRms)
+        {
+            var fdn = new Fdn(Fs);
+            var early = new Early(Fs);
+            fdn.SetDecay(s.Est.Rt60, s.Est.HfRatio);
+            var sec = new float[Early.MaxTaps];
+            var gain = new float[Early.MaxTaps];
+            var pan = new float[Early.MaxTaps];
+            int n = RoomAcoustics.BuildTaps(s.Est, Vector3.forward, sec, gain, pan, Level0Layout.EyeH);
+            early.SetTaps(sec, gain, pan, n);
+
+            int len = Fs * 8;
+            var dry = new float[len];
+            var snd = new float[len];
+            var lp = new Biquad();
+            if (lpHz > 0f) lp.LowPass(Fs, lpHz, 0.7f);
+            int at = Fs / 2;
+            dPeak = 0f;
+            for (int i = 0; i < clip.Length && at + i < len; i++)
+            {
+                float v = clip[i];
+                float d = (lpHz > 0f ? lp.Process(v) : v) * direct;
+                dry[at + i] += d;
+                snd[at + i] += v * send;
+                float a = Math.Abs(d); if (a > dPeak) dPeak = a;
+            }
+            // 部屋の床。これが無いと AGC が声だけを見て動き、実機と挙動が変わる。
+            var hum = ClipData(SoundBank.Ballast);
+            var tone = ClipData(SoundBank.RoomTone);
+            for (int i = 0; i < len; i++)
+                dry[i] += hum[i % hum.Length] * Mix.Ballast + tone[i % tone.Length] * Mix.Tone;
+
+            var buf = new float[len * 2];
+            float w = s.Est.Wet;
+            wPeak = 0f;
+            for (int i = 0; i < len; i++)
+            {
+                float x = dry[i];
+                float rev = x + snd[i];
+                float el, er, rl, rr;
+                early.Process(rev, out el, out er);
+                fdn.Process(rev, out rl, out rr);
+                float wl = (el + rl) * w, wr = (er + rr) * w;
+                buf[i * 2] = x + wl;
+                buf[i * 2 + 1] = x + wr;
+                float a = Math.Abs(wl); if (a > wPeak) wPeak = a;
+            }
+            var tp = new Tape(Fs) { Amount = 0.7f };
+            tp.Process(buf, 2);
+            outPeak = 0f; outRms = 0f;
+            for (int i = 0; i < buf.Length; i++)
+            {
+                float a = Math.Abs(buf[i]); if (a > outPeak) outPeak = a;
+                outRms += buf[i] * buf[i];
+            }
+            outRms = Mathf.Sqrt(outRms / buf.Length);
             return buf;
         }
 

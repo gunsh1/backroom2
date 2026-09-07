@@ -58,6 +58,39 @@ namespace Backrooms.Audio
         Vector3 _lastFwd = Vector3.forward;
         float _nextProbe;
 
+        // ------------------------------------------------------- 残響への送り
+        // 遠くの人の声は、直接届く音より部屋を回ってきた音のほうが大きい。
+        // 全体に一律の wet を掛けるだけではこれが作れない。音源ごとに
+        // 「残響にだけ入れる」経路を用意して、直接音と独立に量を決める。
+        readonly object _sendGate = new object();
+        float[] _send = new float[4096];
+        float[] _sendRead = new float[4096];
+        int _sendLen;
+
+        public float SendPeak { get; private set; }
+
+        /// <summary>
+        /// 音声スレッドから呼ぶ。ReverbSend が音源の出力をここへ積む。
+        /// Unity は音源のフィルタを聞き手のフィルタより先に処理するので、
+        /// 同じブロックのうちに拾える。取り違えても遅れは 1 ブロックで、
+        /// 残響に入る音としては聞き分けられない。
+        /// </summary>
+        public void PushSend(float[] data, int channels, float gain)
+        {
+            int n = data.Length / channels;
+            lock (_sendGate)
+            {
+                if (_send.Length < n) _send = new float[n];
+                for (int i = 0; i < n; i++)
+                {
+                    int o = i * channels;
+                    float m = channels > 1 ? (data[o] + data[o + 1]) * 0.5f : data[o];
+                    _send[i] += m * gain;
+                }
+                if (n > _sendLen) _sendLen = n;
+            }
+        }
+
         // 録音 (検証用)
         float[] _rec;
         int _recPos;
@@ -153,17 +186,37 @@ namespace Backrooms.Audio
             // ブロック内で滑らかに寄せる。段で切り替えるとザラつきが乗る。
             float step = n > 0 ? (wetTarget - _wetLive) / n : 0f;
 
+            // 送りを引き取る。引き取ったら必ず消す。残すと同じ声が次の
+            // ブロックでもう一度残響に入り、際限なく尾を引く。
+            int sn;
+            lock (_sendGate)
+            {
+                sn = _sendLen; _sendLen = 0;
+                if (sn > 0)
+                {
+                    if (_sendRead.Length < sn) _sendRead = new float[sn];
+                    System.Array.Copy(_send, _sendRead, sn);
+                    System.Array.Clear(_send, 0, sn);
+                }
+            }
+            float sPeak = 0f;
+            for (int i = 0; i < sn; i++)
+            { float a = _sendRead[i]; if (a < 0f) a = -a; if (a > sPeak) sPeak = a; }
+            SendPeak = sPeak;
+
             for (int i = 0; i < n; i++)
             {
                 int o = i * channels;
                 float l = data[o];
                 float r = channels > 1 ? data[o + 1] : l;
                 float mono = (l + r) * 0.5f;
+                // 送られた音は残響にだけ入れる。素の音としては出さない。
+                float rev = i < sn ? mono + _sendRead[i] : mono;
 
                 float el, er2;
-                _early.Process(mono, out el, out er2);
+                _early.Process(rev, out el, out er2);
                 float rl, rr;
-                _fdn.Process(mono, out rl, out rr);
+                _fdn.Process(rev, out rl, out rr);
 
                 _wetLive += step;
                 float w = _wetLive;

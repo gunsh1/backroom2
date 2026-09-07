@@ -194,7 +194,9 @@ namespace Backrooms.Capture
 
             // 歩きながら実際の出力を録る。合成した素材が本当に鳴り、
             // 残響とテープを通って出ているかは、これを測らないと分からない。
-            if (dsp != null) dsp.StartRecord(6f);
+            // 声は歩き出してから撃つ。呼び声と遠くの声が実際に鳴って、
+            // 残響を通って出ているかは録って測らないと分からない。
+            if (dsp != null) { dsp.StartRecord(12f); StartCoroutine(VoiceCues()); }
             yield return WalkTest(fps, route, culler, world, dsp);
             if (dsp != null)
             {
@@ -210,8 +212,31 @@ namespace Backrooms.Capture
                          + "器具 " + (voices != null ? voices.Assigned : -1) + " 台 "
                          + "(壁越し " + (voices != null ? voices.Occluded : -1) + ")  "
                          + "AGC " + (dsp != null ? dsp.TapeGain.ToString("F2") : "-"));
+                var sh = FindFirstObjectByType<Shout>();
+                var dv = FindFirstObjectByType<DistantVoice>();
+                _log.Add("audio voices       : 呼び声 " + (sh != null ? sh.Played : -1) + " 回"
+                         + " (うちキー " + (sh != null ? sh.ByKey : -1) + ")  "
+                         + "遠くの声 " + (dv != null ? dv.Played : -1) + " 回"
+                         + (dv != null && dv.Played > 0
+                            ? $"  最後は {dv.LastDistance:F1}m "
+                              + (dv.LastOccluded ? "壁の向こう" : "見通せる")
+                            : ""));
             }
             Finish();
+        }
+
+        /// <summary>
+        /// 録音の窓の中で声を撃つ。E キーは押せないので直接叩く。
+        /// 遠くの声は平均 2 分に 1 回なので、待っていては録れない。
+        /// </summary>
+        IEnumerator VoiceCues()
+        {
+            var sh = FindFirstObjectByType<Shout>();
+            var dv = FindFirstObjectByType<DistantVoice>();
+            yield return new WaitForSecondsRealtime(1.2f);
+            if (sh != null) sh.Fire();
+            yield return new WaitForSecondsRealtime(3.5f);
+            if (dv != null) dv.Fire();
         }
 
         /// <summary>
