@@ -351,7 +351,12 @@ namespace Backrooms.Audio
         public Tape(float sampleRate)
         {
             _fs = sampleRate;
-            _hpL.HighPass(sampleRate, 95f, 0.7f); _hpR.HighPass(sampleRate, 95f, 0.7f);
+            // 95Hz にしていたが、実録音の足音のエネルギーが 21% しか残らなかった。
+            // リニアモノラルの下限 (約 100Hz) に合わせた値だったが、ステレオを
+            // 残している時点で HiFi トラックを仮定しているので整合していない。
+            // 70Hz にすると 41% 残る。高域の 8kHz はそのまま。あの眠い質感は
+            // そこから出ている。
+            _hpL.HighPass(sampleRate, 70f, 0.7f); _hpR.HighPass(sampleRate, 70f, 0.7f);
             _lpL1.LowPass(sampleRate, 8000f, 0.72f); _lpR1.LowPass(sampleRate, 8000f, 0.72f);
             _lpL2.LowPass(sampleRate, 8000f, 1.60f); _lpR2.LowPass(sampleRate, 8000f, 1.60f);
             int n = (int)(sampleRate * 0.006f) + 8;

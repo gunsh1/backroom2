@@ -24,6 +24,12 @@ namespace Backrooms.Audio
         [Tooltip("踏む間隔のばらつき。歩幅の周期に対する割合")]
         public float TimingJitter = 0.04f;
 
+        /// <summary>
+        /// 実録音を使うときはここに入れる。空なら SoundBank の合成に落ちる。
+        /// 合成と実録音を混ぜない。並べると質感の違いがそのまま聞こえる。
+        /// </summary>
+        public AudioClip[] Clips;
+
         FirstPersonController _fps;
         AudioSource[] _pool;
         int _next;
@@ -61,24 +67,36 @@ namespace Backrooms.Audio
             if (_fps == null || _pool == null) return;
             if (!_fps.SteppedThisFrame) return;
 
-            // 同じ足でも 1 歩ずつ波形を変える。直前と同じものは使わない。
             bool left = _fps.LastStepWasLeft;
-            int v;
-            if (left) { _varL = (_varL + 1 + Random.Range(0, SoundBank.StepVariants - 1))
-                                % SoundBank.StepVariants; v = _varL; }
-            else      { _varR = (_varR + 1 + Random.Range(0, SoundBank.StepVariants - 1))
-                                % SoundBank.StepVariants; v = _varR; }
-            int k = SoundBank.StepIndex(_pair, !left, v);
+            AudioClip clip;
+            if (Clips != null && Clips.Length > 0)
+            {
+                // 実録音。数が少ないので、直前と同じものは避けて順に回す。
+                _varL = (_varL + 1) % Clips.Length;
+                clip = Clips[_varL];
+            }
+            else
+            {
+                // 同じ足でも 1 歩ずつ波形を変える。直前と同じものは使わない。
+                int v;
+                if (left) { _varL = (_varL + 1 + Random.Range(0, SoundBank.StepVariants - 1))
+                                    % SoundBank.StepVariants; v = _varL; }
+                else      { _varR = (_varR + 1 + Random.Range(0, SoundBank.StepVariants - 1))
+                                    % SoundBank.StepVariants; v = _varR; }
+                clip = SoundBank.Footsteps[SoundBank.StepIndex(_pair, !left, v)];
+            }
             var s = _pool[_next];
             _next = (_next + 1) % _pool.Length;
 
-            s.clip = SoundBank.Footsteps[k];
+            s.clip = clip;
             s.pitch = 1f;
             float speed = Mathf.Clamp01(_fps.SpeedNormalized);
             // 踏み込みの強さ。忍び足と全力で 3 倍ほど違い、さらに 1 歩ごとに
             // 1.5dB ばらつく。人はいつも同じ強さで踏まない。音程を振るのと
             // 違って、強さを振っても体格は変わらない。
+            // 左右差。素材が 1 つでも、踏む足で強さが違えば交互に聞こえる。
             float vol = Volume * Mathf.Lerp(0.45f, 1.25f, speed)
+                        * (left ? 1.0f : 0.90f)
                         * (0.84f + Random.value * 0.32f);
             if (_fps.IsCrouching) vol *= 0.40f;
             s.volume = vol;

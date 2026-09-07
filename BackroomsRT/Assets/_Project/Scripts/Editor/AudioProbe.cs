@@ -43,6 +43,13 @@ namespace Backrooms.EditorTools
             DumpClip(dir, "src_ballast_fail.wav", SoundBank.BallastFail, log);
             DumpClip(dir, "src_hvac.wav", SoundBank.Hvac, log);
             DumpClip(dir, "src_roomtone.wav", SoundBank.RoomTone, log);
+            {
+                var rc = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(
+                    "Assets/_Project/Audio/Step_Carpet.wav");
+                log.AppendLine(rc != null
+                    ? string.Format("  足音は実録音 Step_Carpet.wav ({0:F3}s)", rc.length)
+                    : "  足音は合成 (実録音が見つからない)");
+            }
             DumpClip(dir, "src_stepL.wav", SoundBank.Footsteps[SoundBank.StepIndex(0, false, 0)], log);
             DumpClip(dir, "src_stepL2.wav", SoundBank.Footsteps[SoundBank.StepIndex(0, false, 1)], log);
             DumpClip(dir, "src_stepR.wav", SoundBank.Footsteps[SoundBank.StepIndex(0, true, 0)], log);
@@ -215,15 +222,19 @@ namespace Backrooms.EditorTools
             int len = Fs * 7;
             var dry = new float[len];
             var rnd = new System.Random(4242);
+            var rec = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(
+                "Assets/_Project/Audio/Step_Carpet.wav");
+            float[] recData = rec != null ? ClipData(rec) : null;
             float stride = 1f / 1.9f;              // 歩幅の周期
             float t = 0.35f;
             for (int k = 0; k < 12; k++)
             {
                 bool right = (k & 1) == 1;
-                var clip = ClipData(SoundBank.Footsteps[
+                var clip = recData ?? ClipData(SoundBank.Footsteps[
                     SoundBank.StepIndex(0, right, k % SoundBank.StepVariants)]);
                 float jitter = (float)rnd.NextDouble() * 0.04f * stride;
-                float lvl = 0.55f * (0.84f + (float)rnd.NextDouble() * 0.32f);
+                float lvl = 0.55f * (right ? 0.90f : 1.0f)
+                            * (0.84f + (float)rnd.NextDouble() * 0.32f);
                 int at = Mathf.RoundToInt((t + jitter) * Fs);
                 for (int i = 0; i < clip.Length && at + i < len; i++) dry[at + i] += clip[i] * lvl;
                 t += stride;

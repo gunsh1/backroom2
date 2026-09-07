@@ -648,7 +648,20 @@ namespace Backrooms.EditorTools
             // 胸の高さ (1.345m) なので、身長はそのままに EyeOffset で下げる。
             player.GetComponent<FirstPersonController>().EyeOffset
                 = _eyeH - player.GetComponent<FirstPersonController>().StandHeight;
-            if (_audio) player.AddComponent<Footsteps>();
+            if (_audio)
+            {
+                var steps = player.AddComponent<Footsteps>();
+                // 実録音があれば合成より優先する。
+                var rec = AssetDatabase.LoadAssetAtPath<AudioClip>(
+                    "Assets/_Project/Audio/Step_Carpet.wav");
+                if (rec != null)
+                {
+                    steps.Clips = new[] { rec };
+                    Log.Add("footsteps: 実録音 Step_Carpet.wav を使用 ("
+                            + rec.length.ToString("F3") + "s)");
+                }
+                else Log.Add("footsteps: 実録音が見つからないので合成に落ちる");
+            }
 
             var camGo = new GameObject("MainCamera");
             camGo.transform.SetParent(head.transform, false);
