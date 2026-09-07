@@ -17,7 +17,8 @@ namespace Backrooms.Player
     /// 動悸を残す。息と手の震えが戻りきらないことのほうが、鳴っている
     /// 15 秒よりも長く効く。
     ///
-    /// 触るもの: 音 (Sting / 女声 / 息)、カメラの揺れ、VHS の荒れ、走る速さ。
+    /// 触るもの: 音 (Sting / 女声 / 息)、カムコーダの AGC、カメラの揺れ、
+    /// VHS の荒れ、足の速さ。
     /// どれも「基準値 + 強度 x 追加分」で書くので、強度が 0 に戻れば
     /// 必ず元の値に戻る。イベントが値を持ち逃げしない。
     /// </summary>
@@ -31,6 +32,8 @@ namespace Backrooms.Player
         public float ChanceDecay = 0.5f;
         /// <summary>呼びかけに反応して自分で抽選するか。測定中は切る。</summary>
         [System.NonSerialized] public bool AutoRoll = true;
+        [Tooltip("テスト用。このキーで必ず起きる。確率は減らさない")]
+        public KeyCode TestKey = KeyCode.V;
 
         [Header("長さ")]
         [Tooltip("鳴り始めてから収まるまで (秒)")]
@@ -44,16 +47,28 @@ namespace Backrooms.Player
         public float StingVolume = Mix.Sting;
         [Tooltip("この秒数だけ遅らせて女声を出す。同時だと Sting に埋もれる")]
         public float VoiceDelay = 1.6f;
-        [Tooltip("イベント時の女声の倍率")]
-        public float VoiceGain = 4f;
+        [Tooltip("イベント時の女声の直接音の倍率")]
+        public float VoiceGain = 24f;
+        [Tooltip("女声を部屋へ送る量の倍率。直接音と同じだけ送ると部屋が飽和して声に聞こえない")]
+        public float VoiceSendGain = 4f;
 
         [Header("効き方")]
         [Tooltip("最大時のカメラの揺れ")]
         public float ShakePanic = 1.0f;
         [Tooltip("動悸が残っている間のカメラの揺れ")]
-        public float ShakeAfter = 0.22f;
-        [Tooltip("最大時に走る速さへ掛ける増分")]
-        public float SprintBoost = 0.45f;
+        public float ShakeAfter = 0.10f;
+        [Tooltip("最大時に足の速さへ掛ける増分。1.0 で 2 倍")]
+        public float SpeedBoost = 1.0f;
+        /// <summary>
+        /// イベント中に AGC が絞れる下限。1 = 絞らない、1 より上 = 逆に押し上げる。
+        /// AudioSource.volume は 1.0 で頭打ちなので、音源側をいくら上げても
+        /// これ以上は出ない。爆音を決めているのは実質ここひとつ。
+        /// 1.0 (絞らない) で出力ピークが 0.590 だった。テープの帯域制限で
+        /// 目減りするぶんを見込んで、飽和の手前 (0.9 台) に来る 1.8 に置く。
+        /// 全部に同じだけ掛かるので、Sting も女声も息も一緒に上がる。
+        /// </summary>
+        [Tooltip("最大時に AGC が絞れる下限。1 = 絞らない。爆音を決めているのはここ")]
+        public float PanicAgcFloor = 1.8f;
 
         public int Fired { get; private set; }
         public float Chance { get; private set; }
@@ -69,8 +84,9 @@ namespace Backrooms.Player
         FirstPersonController _fps;
         AudioSource _sting;
         VhsPostProcess _vhs;
+        ListenerDsp _dsp;
 
-        float _baseSprint;
+        float _baseSprint, _baseWalk, _baseFloor = 0.25f;
         float _bTape, _bTrack, _bDrop, _bGrain, _bScan, _bHead, _bChroma, _bDesat;
         bool _haveVhs;
 
@@ -87,7 +103,10 @@ namespace Backrooms.Player
             _voice = FindFirstObjectByType<DistantVoice>();
             _fps = GetComponentInParent<FirstPersonController>();
             if (_fps == null) _fps = FindFirstObjectByType<FirstPersonController>();
-            if (_fps != null) _baseSprint = _fps.SprintSpeed;
+            if (_fps != null) { _baseSprint = _fps.SprintSpeed; _baseWalk = _fps.WalkSpeed; }
+            // AGC の下限。イベント中だけ開けて、爆音が絞られないようにする。
+            _dsp = FindFirstObjectByType<ListenerDsp>();
+            if (_dsp != null) _baseFloor = _dsp.AgcMinGain;
 
             var cam = Camera.main;
             if (cam != null)
@@ -128,6 +147,10 @@ namespace Backrooms.Player
                 }
             }
 
+            // テスト用。抽選を待たずに必ず起こす。確率は減らさない。
+            // Shout と同じく、窓が前面に無いときの入力は見ない。
+            if (AutoRoll && Application.isFocused && Input.GetKeyDown(TestKey)) Fire(false);
+
             if (_active)
             {
                 _t += Time.deltaTime;
@@ -137,7 +160,7 @@ namespace Backrooms.Player
                 if (!_voiceDone && _t >= _voiceAt)
                 {
                     _voiceDone = true;
-                    if (_voice != null) _voice.Fire(VoiceGain);
+                    if (_voice != null) _voice.Fire(VoiceGain, VoiceSendGain);
                 }
                 if (Panic <= 0f && After <= 0f) _active = false;
             }
@@ -146,15 +169,18 @@ namespace Backrooms.Player
             Apply();
         }
 
-        /// <summary>今すぐ起こす。確率は消費する。キャプチャからも叩ける。</summary>
-        public bool Fire()
+        /// <summary>今すぐ起こす。キャプチャからも叩ける。</summary>
+        public bool Fire() { return Fire(true); }
+
+        /// <summary>spendChance が false なら確率を減らさない (テストキー用)。</summary>
+        public bool Fire(bool spendChance)
         {
             _active = true;
             _t = 0f;
             _voiceDone = false;
             _voiceAt = VoiceDelay;
             Fired++;
-            Chance *= ChanceDecay;
+            if (spendChance) Chance *= ChanceDecay;
 
             if (_sting != null && Sting != null)
             {
@@ -177,8 +203,15 @@ namespace Backrooms.Player
 
             if (_shake != null) _shake.Amount = p * ShakePanic + afterOnly * ShakeAfter;
             if (_breath != null) { _breath.Panic = p; _breath.After = After; }
+            // 走りだけ上げると、歩いている人には何も起きない。足そのものを速くする。
             if (_fps != null && _baseSprint > 0f)
-                _fps.SprintSpeed = _baseSprint * (1f + p * SprintBoost);
+            {
+                _fps.SprintSpeed = _baseSprint * (1f + p * SpeedBoost);
+                _fps.WalkSpeed = _baseWalk * (1f + p * SpeedBoost);
+            }
+            // AGC を開ける。ここを開けないと Sting をいくら上げても
+            // 0.12 秒で 1/4 に叩き落とされて、爆音にはならない。
+            if (_dsp != null) _dsp.AgcMinGain = Mathf.Lerp(_baseFloor, PanicAgcFloor, p);
 
             if (!_haveVhs || _vhs == null) return;
             // テープが暴れる。ClampedFloatParameter が上限で止めるので、

@@ -32,6 +32,11 @@ namespace Backrooms.Audio
         /// Mix が実測の音圧から比で決めている。
         /// </summary>
         [Range(0.002f, 0.20f)] public float OutputLevel = Mix.Output;
+        /// <summary>
+        /// AGC が下げられる下限。0.25 が実機のカムコーダ。イベント中だけ
+        /// PanicEvent が 1.0 (絞らない) へ寄せて、爆音をそのまま通す。
+        /// </summary>
+        [System.NonSerialized] public float AgcMinGain = 0.25f;
         public bool Enabled = true;
 
         /// <summary>直前に測った部屋。ログと検証用。</summary>
@@ -227,6 +232,7 @@ namespace Backrooms.Audio
 
             _tape.Amount = TapeAmount;
             _tape.AgcTarget = OutputLevel;
+            _tape.AgcMinGain = AgcMinGain;
             _tape.Process(data, channels);
             TapeGain = _tape.CurrentGain;
 

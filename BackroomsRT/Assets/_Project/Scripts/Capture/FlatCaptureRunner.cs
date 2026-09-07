@@ -71,6 +71,7 @@ namespace Backrooms.Capture
             var torch = FindFirstObjectByType<Flashlight>();
             var culler = FindFirstObjectByType<LightCuller>();
             var route = FindFirstObjectByType<CaptureRoute>();
+            _route = route;
             var world = FindFirstObjectByType<ChunkedLevel0>();
             var dsp = FindFirstObjectByType<ListenerDsp>();
             var shots = (route != null && route.Shots != null && route.Shots.Length > 0)
@@ -304,22 +305,61 @@ namespace Backrooms.Capture
             float grain0 = vhs != null ? vhs.grain.value : 0f;
             float track0 = vhs != null ? vhs.tracking.value : 0f;
 
+            // 揺れが実際に何度まで振れたかを見る。振れ幅は Amount x RotDegrees で
+            // 決まるが、Perlin なので毎フレーム最大まで行くわけではない。
+            var camT = Camera.main != null ? Camera.main.transform : null;
+            Quaternion rot0 = camT != null ? camT.localRotation : Quaternion.identity;
+            float maxRot = 0f, maxPos = 0f, maxGain = 0f, minGain = 99f;
+            Vector3 pos0 = camT != null ? camT.localPosition : Vector3.zero;
+
+            // 揺れている最中の絵を撮る。「道がぎりぎり読める」かどうかは
+            // 数字ではなく絵でしか判定できない。同じ場所・同じ向きで
+            // 発生前と並べる。
+            var probe = _route != null ? _route.FpsProbe : new Vector3(3.0f, 0f, 3.0f);
+            float probeYaw = _route != null ? _route.FpsYaw : 40f;
+            if (fps != null) { fps.SetPose(probe, probeYaw, 0f); fps.enabled = false; }
+            var prt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32,
+                                        RenderTextureReadWrite.sRGB) { name = "PanicTarget" };
+            prt.Create();
+            if (Camera.main != null) Camera.main.targetTexture = prt;
+            for (int i = 0; i < 60; i++) yield return new WaitForEndOfFrame();
+            ReadOut(prt, System.IO.Path.Combine(OutputDir, "P0_before.png"), _route);
+
             if (dsp != null) dsp.StartRecord(20f);
             pe.Fire();
+            float[] shotAt = { 0.8f, 2.5f, 6.0f, 12.0f };
+            string[] shotName = { "P1_t08", "P2_t25", "P3_t60", "P4_t120" };
+            int shotNext = 0;
 
             var rows = new System.Text.StringBuilder();
             float t0 = Time.unscaledTime, next = 0f;
             while (Time.unscaledTime - t0 < 22f)
             {
                 float t = Time.unscaledTime - t0;
+                if (camT != null)
+                {
+                    maxRot = Mathf.Max(maxRot, Quaternion.Angle(rot0, camT.localRotation));
+                    maxPos = Mathf.Max(maxPos, Vector3.Distance(pos0, camT.localPosition));
+                }
+                if (dsp != null && t > 0.05f)
+                {
+                    maxGain = Mathf.Max(maxGain, dsp.TapeGain);
+                    minGain = Mathf.Min(minGain, dsp.TapeGain);
+                }
+                if (shotNext < shotAt.Length && t >= shotAt[shotNext])
+                {
+                    ReadOut(prt, System.IO.Path.Combine(OutputDir, shotName[shotNext] + ".png"), _route);
+                    shotNext++;
+                }
                 if (t >= next)
                 {
-                    rows.Append(string.Format("{0:F0}s p{1:F2} 揺{2:F2} 粒{3:F2} 追{4:F2} 走{5:F1} 息{6:F2}  ",
+                    rows.Append(string.Format("{0:F0}s p{1:F2} 揺{2:F2} 粒{3:F2} 追{4:F2} 走{5:F1} 息{6:F2} 利{7:F2}  ",
                         t, pe.Panic, shake != null ? shake.Amount : -1f,
                         vhs != null ? vhs.grain.value : -1f,
                         vhs != null ? vhs.tracking.value : -1f,
                         fps != null ? fps.SprintSpeed : -1f,
-                        br != null ? br.Rate : -1f));
+                        br != null ? br.Rate : -1f,
+                        dsp != null ? dsp.TapeGain : -1f));
                     next += 3f;
                 }
                 yield return null;
@@ -334,7 +374,15 @@ namespace Backrooms.Capture
                 catch (System.Exception e) { _log.Add("panic audio 失敗: " + e.Message); }
             }
 
+            if (Camera.main != null) Camera.main.targetTexture = null;
+            prt.Release();
+            if (fps != null) fps.enabled = true;
+
             _log.Add($"panic: 発生 {pe.Fired} 回 / 次の確率 {pe.Chance * 100f:F2}%");
+            _log.Add(string.Format(
+                "  カメラ: 最大 {0:F1} 度 / {1:F3} m  (画角 {2:F0} 度) / AGC {3:F2}-{4:F2}",
+                maxRot, maxPos, Camera.main != null ? Camera.main.fieldOfView : -1f,
+                minGain, maxGain));
             _log.Add("  " + rows.ToString().TrimEnd());
             _log.Add(string.Format(
                 "  収束後: 揺れ {0:F2} (動悸ぶん) / 走り {1:F1} (基準 {2:F1}) / "
@@ -510,6 +558,8 @@ namespace Backrooms.Capture
         /// 値が入っていればそれを掛ける。掛ける前の生の画も _raw.png として
         /// 残す。媒体の値は生の画から測り直すので、これが無いと較正できない。
         /// </summary>
+        CaptureRoute _route;
+
         void ReadOut(RenderTexture rt, string path, CaptureRoute route)
         {
             var prevActive = RenderTexture.active;

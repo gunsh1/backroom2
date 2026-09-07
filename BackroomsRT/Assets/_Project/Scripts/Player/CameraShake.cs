@@ -17,10 +17,13 @@ namespace Backrooms.Player
         /// <summary>0 で静止、1 で最大。外から書く。</summary>
         [System.NonSerialized] public float Amount;
 
+        // 最大時は「どこへ歩けるかがぎりぎり読める」ところまで振る。
+        // 回転で +-9 度 (ロールは +-13.5 度)、画角 47 度に対して 1/5 が
+        // 毎フレーム動く。これ以上振ると道が読めず、ただ操作不能になる。
         [Tooltip("最大時の振れ幅 (m)")]
-        public float PosMeters = 0.045f;
+        public float PosMeters = 0.120f;
         [Tooltip("最大時の振れ幅 (度)")]
-        public float RotDegrees = 2.4f;
+        public float RotDegrees = 9.0f;
         [Tooltip("揺れの速さ (Hz 相当)")]
         public float Frequency = 6.5f;
 

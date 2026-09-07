@@ -101,9 +101,10 @@ namespace Backrooms.Audio
 
         /// <summary>
         /// 次の 1 回を今すぐ鳴らす。キャプチャとイベントからも叩ける。
-        /// gain はイベント時に前に出すための倍率。
+        /// gain はイベント時に前に出すための倍率。送りは別に指定できる。
+        /// 直接音と同じだけ残響へ送ると、部屋ぜんぶが飽和して声に聞こえない。
         /// </summary>
-        public bool Fire(float gain = 1f)
+        public bool Fire(float gain = 1f, float sendGain = -1f)
         {
             Schedule();
             if (Clips == null || Clips.Length == 0 || _direct == null || _ear == null) return false;
@@ -139,7 +140,7 @@ namespace Backrooms.Audio
             _direct.PlayScheduled(at);
             _wet.clip = clip;
             _wet.PlayScheduled(at);
-            if (_send != null) _send.Gain = Send * gain;
+            if (_send != null) _send.Gain = Send * (sendGain < 0f ? gain : sendGain);
 
             LastAt = p; LastDistance = dist; LastOccluded = blocked;
             Played++;

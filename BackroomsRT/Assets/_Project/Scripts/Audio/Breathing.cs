@@ -47,7 +47,7 @@ namespace Backrooms.Audio
         [Tooltip("Heavy に完全に入れ替わったときの追加の速さ")]
         public float PanicRate = 0.15f;
         [Tooltip("Heavy に完全に入れ替わったときの音量の倍率")]
-        public float PanicGain = 2.6f;
+        public float PanicGain = 6.5f;
         [Tooltip("動悸が残っている間の追加の速さ。素材は Normal のまま")]
         public float AfterRate = 0.12f;
         [Tooltip("動悸が残っている間の音量の倍率")]

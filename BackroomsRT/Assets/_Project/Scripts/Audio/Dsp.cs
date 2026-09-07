@@ -411,6 +411,12 @@ namespace Backrooms.Audio
         public float WowPercent = 0.15f;   // ピッチ揺れ (%)
         public float AgcTarget = Mix.Output;   // AGC が狙う実効値 = 最終的な音量
         public float AgcMaxGain = Mix.AgcMaxGain;
+        /// <summary>
+        /// AGC が下げられる下限。既定の 0.25 は実機のカムコーダの挙動で、
+        /// 大きな音が入ると 0.12 秒で 1/4 まで叩き落とす。イベントで爆音を
+        /// 通したいときだけ 1.0 に寄せる。1.0 = 一切絞らない。
+        /// </summary>
+        public float AgcMinGain = 0.25f;
 
         public Tape(float sampleRate)
         {
@@ -466,7 +472,7 @@ namespace Backrooms.Audio
                 _env += envA * (a * 0.5f - _env);
                 float want = _env > 1e-5f ? AgcTarget / _env : AgcMaxGain;
                 if (want > AgcMaxGain) want = AgcMaxGain;
-                if (want < 0.25f) want = 0.25f;
+                if (want < AgcMinGain) want = AgcMinGain;
                 _agc += (want < _agc ? dnA : upA) * (want - _agc);
                 l *= _agc; r *= _agc;
 
@@ -483,10 +489,23 @@ namespace Backrooms.Audio
                 float h = Hiss * (0.5f + 0.5f * _agc);
                 l += Noise() * h; r += Noise() * h;
 
-                data[o] = data[o] * (1f - k) + l * k;
-                if (channels > 1) data[o + 1] = data[o + 1] * (1f - k) + r * k;
+                data[o] = Soft(data[o] * (1f - k) + l * k);
+                if (channels > 1) data[o + 1] = Soft(data[o + 1] * (1f - k) + r * k);
                 for (int c = 2; c < channels; c++) data[o + c] = 0f;
             }
+        }
+
+        /// <summary>
+        /// 0.7 までは素通し。それより上だけ丸めて 1.0 に漸近させる。
+        /// AGC を開けたまま爆音を通すと 1.0 を超えるが、デジタルの切り落としは
+        /// 折り返しに近い耳障りな音になる。テープは飽和しても折り返さない。
+        /// </summary>
+        static float Soft(float x)
+        {
+            float a = Math.Abs(x);
+            if (a <= 0.7f) return x;
+            float y = 0.7f + 0.3f * (float)Math.Tanh((a - 0.7f) / 0.3f);
+            return x < 0f ? -y : y;
         }
 
         public float CurrentGain { get { return _agc; } }

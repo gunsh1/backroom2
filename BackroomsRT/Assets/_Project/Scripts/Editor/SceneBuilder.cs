@@ -824,6 +824,9 @@ namespace Backrooms.EditorTools
                         + $"(起きるたび x{panic.ChanceDecay:F2}) / 収束 {panic.Settle:F0} 秒 / "
                         + $"動悸 {panic.AfterSeconds:F0} 秒 / "
                         + (panic.Sting != null ? $"Sting {panic.Sting.length:F1}s" : "Sting 無し"));
+                Log.Add($"  Sting {panic.StingVolume:F2} / AGC の下限 {panic.PanicAgcFloor:F2} "
+                        + $"/ 女声 x{panic.VoiceGain:F0} (送り x{panic.VoiceSendGain:F0}) "
+                        + $"/ 足 x{1f + panic.SpeedBoost:F1} / テストキー {panic.TestKey}");
             }
 
             var camGo = new GameObject("MainCamera");
