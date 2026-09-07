@@ -1,9 +1,12 @@
-=== SceneBuilder (photoreal) 2026/09/07 11:57:31 ===
+=== SceneBuilder (photoreal) 2026/09/07 12:37:00 ===
 === 無限生成 (ChunkedLevel0) ===
 チャンク 14.4 m 角 / 読み込み半径 4 (58 m) / ライトは半径 3 まで
-スポーン (0.90, 0.00, 0.90) yaw 145  遠景 1 (37.10, 0.00, 25.10)  遠景 2 (-30.90, 0.00, 61.10)
-歩行経路 16 点 / 直線距離 43.5 m
+スポーン (0.90, 0.00, 0.90) yaw 145  遠景 1 (37.10, 0.00, 25.10)  遠景 2 (-30.90, 0.00, 62.90)
+歩行経路 44 点 / 直線距離 43.5 m
 器具の状態 (6400 ベイの標本): 点灯 50% / 切れ 14% / ちらつき 4% / 器具なし 30%
+一帯の性格 (面積比): 大部屋 13% / 小割り 8% / 標準 79%
+天井の変化 (14.4m 角のチャンク 1 つあたり): 抜けたタイル 0.9 枚 / 点検口 1.0 / 吹き出し口 3.5
+到達性: 46m 先の 8 方向のうち 6/8 に経路がある
 decals: 0 projectors
   set  VisualEnvironment.skyType = 0
   set  Exposure.mode = AutomaticHistogram
@@ -68,17 +71,18 @@ decals: 0 projectors
   set  LensDistortion.scale = 1
   set  VhsPostProcess.intensity = 0.75
   set  VhsPostProcess.lines = 486
-  set  VhsPostProcess.lumaBand = 420
-  set  VhsPostProcess.chromaBand = 60
+  set  VhsPostProcess.lumaBand = 333
+  set  VhsPostProcess.chromaBand = 40
   set  VhsPostProcess.chroma = 0.85
-  set  VhsPostProcess.desaturate = 0.08
-  set  VhsPostProcess.sharpen = 0.1
-  set  VhsPostProcess.tape = 0.15
-  set  VhsPostProcess.tracking = 0.2
+  set  VhsPostProcess.desaturate = 0.32
+  set  VhsPostProcess.tint = 0.35
+  set  VhsPostProcess.sharpen = 0.32
+  set  VhsPostProcess.tape = 0.3
+  set  VhsPostProcess.tracking = 0.35
   set  VhsPostProcess.dropout = 0.1
-  set  VhsPostProcess.headSwitch = 0.25
-  set  VhsPostProcess.scanline = 0.12
-  set  VhsPostProcess.grain = 0.25
+  set  VhsPostProcess.headSwitch = 0.35
+  set  VhsPostProcess.scanline = 0.2
+  set  VhsPostProcess.grain = 0.45
   set  VhsPostProcess.fisheye = 0.4
   set  VhsPostProcess.pillarbox = True
   set  MotionBlur.intensity = 0.22
@@ -90,6 +94,6 @@ volume profile: Assets/_Project/Settings/Level0_Volume.asset
 footsteps: 実録音 Step_Carpet.wav を使用 (0.254s)
 camera: TAA High, 出力 52.17deg vFOV / 水平 66.27deg / 比率 1.333 (1440x1080) / レンダ 52.17deg (overscan 1.000), black background
 camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on
-player rig built at (0.90, 0.00, 0.90) yaw 145, 4 capture views
+player rig built at (0.90, 0.00, 0.90) yaw 145, 6 capture views
 saved: Assets/_Project/Scenes/Level0.unity
 RESULT: OK

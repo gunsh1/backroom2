@@ -66,17 +66,56 @@ namespace Backrooms.Generation
         /// </summary>
         const int RunUnits = 4;
 
+        /// <summary>一帯の性格。14.4m 角ごとに決まる。</summary>
+        public enum Space { Hall, Normal, Warren }
+
+        /// <summary>壁の格子 4 区画ぶん = 14.4m 角。部屋 1 つぶんの大きさ。</summary>
+        public const int SpaceZone = 4;
+
+        /// <summary>
+        /// その一帯が「大部屋」か「小割り」か。
+        ///
+        /// 壁の出る確率を全域で同じにすると、部屋の寸法がどこでも同じになる。
+        /// 歩いても景色が変わらないのは形が変わらないからで、明かりの欠けを
+        /// いくら振っても直らない。実際のフロアは、間仕切りを抜いた大部屋と
+        /// 小割りにした一帯が混ざっている。
+        ///
+        /// ただし珍しいから効く。8 割は標準のままにして、変わった一帯が
+        /// ときどき現れる形にする。
+        /// </summary>
+        public static Space SpaceAt(int i, int j, int seed)
+        {
+            float u = Unit(FloorDiv(i, SpaceZone), FloorDiv(j, SpaceZone), seed * 7 + 51);
+            if (u < 0.11f) return Space.Hall;
+            if (u > 0.92f) return Space.Warren;
+            return Space.Normal;
+        }
+
+        /// <summary>その一帯で壁帯が出る確率。</summary>
+        static float BandChance(int i, int j, int seed)
+        {
+            switch (SpaceAt(i, j, seed))
+            {
+                // 大部屋。壁がほとんど無く、代わりに柱だけが残る
+                case Space.Hall: return 0.13f;
+                // 小割り。ここだけ通路が細かく折れる。0.46 より上げると
+                // 四方を塞がれた区画ができて通れなくなる
+                case Space.Warren: return 0.46f;
+                default: return 0.34f;
+            }
+        }
+
         /// <summary>x = i*WallPitch の線上、z ∈ [j, j+1) 区画に壁があるか。</summary>
         public static bool WallX(int i, int j, int seed)
         {
-            if (Unit(i, FloorDiv(j, RunUnits), seed * 7 + 11) > 0.34f) return false;
+            if (Unit(i, FloorDiv(j, RunUnits), seed * 7 + 11) > BandChance(i, j, seed)) return false;
             return Unit(i, j, seed * 7 + 12) < 0.86f;
         }
 
         /// <summary>z = j*WallPitch の線上、x ∈ [i, i+1) 区画に壁があるか。</summary>
         public static bool WallZ(int i, int j, int seed)
         {
-            if (Unit(FloorDiv(i, RunUnits), j, seed * 7 + 21) > 0.34f) return false;
+            if (Unit(FloorDiv(i, RunUnits), j, seed * 7 + 21) > BandChance(i, j, seed)) return false;
             return Unit(i, j, seed * 7 + 22) < 0.86f;
         }
 
@@ -87,10 +126,46 @@ namespace Backrooms.Generation
         public static float WallThickZ(int i, int j, int seed)
             => Unit(FloorDiv(i, RunUnits), j, seed * 7 + 23) < 0.28f ? ThickT : ThinT;
 
-        /// <summary>独立柱。壁が 1 枚も触れていない格子点にだけ立つ。</summary>
+        /// <summary>
+        /// 壁帯の中心線。厚い壁だけ 0.3m 寄せる。
+        ///
+        /// 3.6m の格子線に厚み 1.8m を左右対称に載せると、壁の面が
+        /// 0.6m のタイル格子のちょうど真ん中を通る。天井はタイル 1 枚
+        /// 単位でしか置けないので、面がマスを二分すると、そのマスを
+        /// 置くか置かないかで 0.3m の食い違いが必ず出る。しかも中心が
+        /// 面にちょうど重なるので、Solid の勝敗が float の丸めで決まる。
+        /// 実測すると 1.8m 壁の面 34 のうち 16 が「塊」と判定されていて、
+        /// そこだけ天井が 1 枚抜け、壁沿いに 0.3m の穴が回っていた。
+        /// 穴の向こうには何も無いので真っ黒に落ち、壁と天井の境に
+        /// 濃い線が引かれたように見える。
+        ///
+        /// 厚い壁を 0.3m 振れば面は必ずタイルの境界に乗り、二分が起きない。
+        /// 実在の間仕切りも柱心から振れて立つので、形としても正しい。
+        /// </summary>
+        static float Shift(float thick, uint h)
+            => thick > ThinT + 0.01f ? ((h & 1) == 0 ? Cell * 0.5f : -Cell * 0.5f) : 0f;
+
+        /// <summary>x 固定の壁帯の中心 (world x)。</summary>
+        public static float WallCenterX(int i, int j, int seed)
+            => i * WallPitch + Shift(WallThickX(i, j, seed),
+                                     Hash(i, FloorDiv(j, RunUnits), seed * 7 + 14));
+
+        /// <summary>z 固定の壁帯の中心 (world z)。</summary>
+        public static float WallCenterZ(int i, int j, int seed)
+            => j * WallPitch + Shift(WallThickZ(i, j, seed),
+                                     Hash(FloorDiv(i, RunUnits), j, seed * 7 + 24));
+
+        /// <summary>
+        /// 独立柱。壁が 1 枚も触れていない格子点にだけ立つ。
+        ///
+        /// 大部屋では確率を上げる。間仕切りを抜いたフロアで残るのは構造柱
+        /// だけなので、広い所ほど柱が目立つのが本来の姿になる。柱が 3.6m
+        /// 格子で並ぶ広間は、壁で仕切った部屋とは全く別の空間に見える。
+        /// </summary>
         public static bool Column(int i, int j, int seed)
         {
-            if (Unit(i, j, seed * 7 + 31) > 0.075f) return false;
+            float p = SpaceAt(i, j, seed) == Space.Hall ? 0.34f : 0.075f;
+            if (Unit(i, j, seed * 7 + 31) > p) return false;
             return !WallX(i, j, seed) && !WallX(i, j - 1, seed)
                 && !WallZ(i, j, seed) && !WallZ(i - 1, j, seed);
         }
@@ -112,13 +187,13 @@ namespace Backrooms.Generation
                     if (WallX(i, j, seed))
                     {
                         float t = WallThickX(i, j, seed) * 0.5f;
-                        if (Mathf.Abs(x - i * WallPitch) < t
+                        if (Mathf.Abs(x - WallCenterX(i, j, seed)) < t
                             && z > j * WallPitch && z < (j + 1) * WallPitch) return true;
                     }
                     if (WallZ(i, j, seed))
                     {
                         float t = WallThickZ(i, j, seed) * 0.5f;
-                        if (Mathf.Abs(z - j * WallPitch) < t
+                        if (Mathf.Abs(z - WallCenterZ(i, j, seed)) < t
                             && x > i * WallPitch && x < (i + 1) * WallPitch) return true;
                     }
                     if (Column(i, j, seed)
@@ -168,6 +243,27 @@ namespace Backrooms.Generation
             if (Unit(FloorDiv(i, Zone), FloorDiv(j, Zone), seed * 7 + 45) < 0.24f)
                 return Unit(i, j, seed * 7 + 46) < 0.15f;          // ぽつんと残った 1 台だけ
             return Unit(i, j, seed * 7 + 44) < 0.88f;
+        }
+
+        // -------------------------------------------------------- 天井の変化
+
+        public enum Ceil { Tile, Missing, Hatch, Vent }
+
+        /// <summary>
+        /// 天井 1 マス (600 角) に何があるか。器具の無いマスにだけ効く。
+        ///
+        /// 天井は画面の 4 割を占めるのに、同じタイルと同じ器具しか無かった。
+        /// ただしどれも「たまに 1 つある」物で、並べると天井の設備工事に
+        /// 見えてしまう。14.4m 角のチャンク 1 つあたり、抜けたタイル 0.9 枚 /
+        /// 点検口 1.2 か所 / 吹き出し口 3.5 か所。
+        /// </summary>
+        public static Ceil CeilAt(int ci, int cj, int seed)
+        {
+            float u = Unit(ci, cj, seed * 7 + 61);
+            if (u < 0.0015f) return Ceil.Missing;
+            if (u < 0.0035f) return Ceil.Hatch;
+            if (u < 0.0095f) return Ceil.Vent;
+            return Ceil.Tile;
         }
 
         // ------------------------------------------------------------ 補助

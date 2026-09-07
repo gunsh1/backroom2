@@ -48,6 +48,7 @@ Shader "Hidden/Backrooms/Vhs"
     float  _Scanline;
     float  _Chroma;         // 色のにじみと遅れ
     float  _Desat;
+    float  _Tint;           // 蛍光灯の緑かぶり (補正されない水銀の輝線)
     float  _Fisheye;        // 広角レンズの樽型歪み
     float  _Pillar;         // 4:3 に切り詰めるか
 
@@ -184,15 +185,31 @@ Shader "Hidden/Backrooms/Vhs"
 
         float3 col = ToRgb(float3(luma, iq));
 
+        // ---- 蛍光灯の緑かぶり ----------------------------------------
+        // 4200K の蛍光灯は黒体放射ではなく、水銀の 546nm の輝線が突出する。
+        // これを打ち消すのが CC30M（マゼンタ）の補正フィルタで、業務用の
+        // カメラなら入れる。家庭用機のオートホワイトバランスは色温度の軸
+        // （青-橙）しか動かせないので、緑-マゼンタ軸のずれは残ったままになる。
+        // 蛍光灯しか光源が無い部屋を 1996 年の民生機で撮ると必ずこうなる。
+        // 緑を上げたぶんを赤で相殺して、輝度は動かさない。
+        float3 wb = float3(1.0 - 0.392 * _Tint, 1.0 + 0.18 * _Tint, 1.0 + 0.10 * _Tint);
+        col *= lerp(1.0, wb, k);
+
         // ---- ドロップアウト -----------------------------------------
-        // 磁性体の欠けた所は信号が拾えず、白い破線になって流れる。
+        // 磁性体が欠けた区間は信号が拾えない。ただし VCR には 1H 遅延の
+        // ドロップアウト補償器が入っていて、拾えなかった所には「1 本上の
+        // 走査線」がそのまま差し込まれる。だから実機の欠けは真っ白な棒では
+        // なく、横に伸びた短い縞になる。白く抜けるのは補償が食い付くまでの
+        // 頭だけ。全部を白で塗ると、テープの欠けではなく描画の破綻に見える。
         float doSeed = Hash21(float2(scan, floor(t * 8.0)));
         if (doSeed > 1.0 - _Dropout * k * 0.02)
         {
             float x0 = Hash21(float2(scan + 7.0, floor(t * 8.0)));
-            float w = 0.02 + 0.10 * Hash21(float2(scan + 13.0, floor(t * 8.0)));
+            float w = 0.02 + 0.07 * Hash21(float2(scan + 13.0, floor(t * 8.0)));
             float inSeg = step(x0, uv.x) * step(uv.x, x0 + w);
-            col = lerp(col, float3(0.86, 0.86, 0.82), inSeg * 0.9);
+            float3 prev = Sample(duv - float2(0.0, 2.0 / max(_Lines, 16.0)));
+            float lead = saturate(1.0 - (uv.x - x0) / max(w * 0.30, 1e-5));
+            col = lerp(col, prev + lead * 0.30, inSeg * 0.75);
         }
 
         // ---- 走査線とインターレース ----------------------------------

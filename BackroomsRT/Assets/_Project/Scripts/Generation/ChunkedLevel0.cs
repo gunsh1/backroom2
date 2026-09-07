@@ -242,10 +242,9 @@ namespace Backrooms.Generation
             // ---- 壁と柱 ----
             var wall = new MeshBuilder { UvScaleV = H };
             var bb = new MeshBuilder();
-            var trim = new MeshBuilder();
             int w0 = cx * WallUnitsPerChunk, w1 = w0 + WallUnitsPerChunk;
             int v0 = cz * WallUnitsPerChunk, v1 = v0 + WallUnitsPerChunk;
-            EmitWalls(wall, bb, trim, w0, w1, v0, v1, S);
+            EmitWalls(wall, bb, w0, w1, v0, v1, S);
             Spawn(T, "Walls", wall, Materials.Wallpaper, true);
             Spawn(T, "Baseboards", bb, Materials.Baseboard, false);
 
@@ -256,6 +255,11 @@ namespace Backrooms.Generation
             var lensOn = new MeshBuilder();
             var lensOff = new MeshBuilder();
             var lensFlk = new MeshBuilder();
+
+            var plenum = new MeshBuilder();
+
+            System.Func<int, int, bool> open = (ci, cj) =>
+                !Level0Layout.Solid((ci + 0.5f) * Cell, (cj + 0.5f) * Cell, S);
 
             var isFix = new bool[CellsPerChunk, CellsPerChunk];
             for (int i = i0; i < i1; i++)
@@ -273,16 +277,36 @@ namespace Backrooms.Generation
                 for (int cj = b0; cj < b1; cj++)
                 {
                     if (isFix[ci - a0, cj - b0]) continue;
-                    if (Level0Layout.Solid((ci + 0.5f) * Cell, (cj + 0.5f) * Cell, S)) continue;
-                    tiles.PlaneXZ(ci * Cell + TW * 0.5f, (ci + 1) * Cell - TW * 0.5f,
-                                  cj * Cell + TW * 0.5f, (cj + 1) * Cell - TW * 0.5f,
+                    if (!open(ci, cj)) continue;
+
+                    // タイル 1 枚ぶんの場所を取る物は、タイルの代わりに入る。
+                    // 壁に接したマスには入れない。器具も点検口も吹き出し口も
+                    // 壁際には付けないし、そこだけタイルを壁まで伸ばす処理と
+                    // 噛み合わずに 12mm の隙間が開く。
+                    bool inner = open(ci - 1, cj) && open(ci + 1, cj)
+                              && open(ci, cj - 1) && open(ci, cj + 1);
+                    var kind = inner ? Level0Layout.CeilAt(ci, cj, S) : Level0Layout.Ceil.Tile;
+                    if (kind == Level0Layout.Ceil.Missing)
+                    { EmitMissingTile(plenum, tiles, ci, cj, H, S); continue; }
+                    if (kind == Level0Layout.Ceil.Hatch)
+                    { EmitHatch(fixMesh, ci, cj, H); continue; }
+                    if (kind == Level0Layout.Ceil.Vent)
+                    { EmitVent(fixMesh, plenum, ci, cj, H); continue; }
+
+                    // 壁に接する辺には T バーが立たない。見付ぶんの隙間を残すと
+                    // そこだけ天井裏が細い黒線になって覗く。壁の中まで伸ばして塞ぐ。
+                    const float Lap = 0.030f;
+                    float ex0 = open(ci - 1, cj) ? TW * 0.5f : -Lap;
+                    float ex1 = open(ci + 1, cj) ? TW * 0.5f : -Lap;
+                    float ez0 = open(ci, cj - 1) ? TW * 0.5f : -Lap;
+                    float ez1 = open(ci, cj + 1) ? TW * 0.5f : -Lap;
+                    tiles.PlaneXZ(ci * Cell + ex0, (ci + 1) * Cell - ex1,
+                                  cj * Cell + ez0, (cj + 1) * Cell - ez1,
                                   H + RV, false, Cell * 8f);
                 }
 
             // T バーは連続区間にまとめる。1 マスずつ箱にすると頂点が 20 倍になる。
             // 線はチャンクの左端と手前端だけが持つ (半開区間)。隣と重ならない。
-            System.Func<int, int, bool> open = (ci, cj) =>
-                !Level0Layout.Solid((ci + 0.5f) * Cell, (cj + 0.5f) * Cell, S);
             for (int ci = a0; ci < a1; ci++)
             {
                 int cj = b0;
@@ -311,7 +335,7 @@ namespace Backrooms.Generation
             }
             Spawn(T, "CeilingTiles", tiles, Materials.CeilingTile, false, false);
             Spawn(T, "CeilingGrid", bars, Materials.Metal, false, false);
-            Spawn(T, "CeilingTrim", trim, Materials.Metal, false, false);
+            Spawn(T, "Plenum", plenum, Materials.Plenum, false, false);
             Spawn(T, "TrofferFrames", fixMesh, Materials.Metal, false, false);
             Spawn(T, "DiffusersOn", lensOn, Materials.DiffuserOn, false, false);
             Spawn(T, "DiffusersOff", lensOff, Materials.DiffuserOff, false, false);
@@ -389,12 +413,24 @@ namespace Backrooms.Generation
             return light;
         }
 
-        void EmitWalls(MeshBuilder wall, MeshBuilder bb, MeshBuilder trim,
-                       int i0, int i1, int j0, int j1, int S)
+        /// <summary>
+        /// 壁の上端は天井面より上まで伸ばす。
+        ///
+        /// 壁を天井とちょうど同じ高さで止め、そこに壁見切りアングルを回して
+        /// いた。実物にある部品だが、下を向いた 24mm の水平脚には器具の光が
+        /// 一切当たらない。エリアライトは全て下向きなので、天井まわりで
+        /// 上を向いていない面はどこにも光源を持たない。結果として部屋の
+        /// 四周に暗い帯が回り、天井と壁の境が線で縁取られていた。
+        /// 壁をタイル面より上まで伸ばしてタイルを壁に差し込めば、
+        /// 見えるのは壁紙と天井タイルだけになって帯が消える。
+        /// </summary>
+        public const float WallOverlap = 0.050f;
+
+        void EmitWalls(MeshBuilder wall, MeshBuilder bb, int i0, int i1, int j0, int j1, int S)
         {
-            const float P = Level0Layout.WallPitch, H = Level0Layout.CeilH;
+            const float P = Level0Layout.WallPitch;
+            const float H = Level0Layout.CeilH + WallOverlap;
             const float BT = Level0Builder.BaseT, BH = Level0Builder.BaseH;
-            const float AW = Level0Builder.AngleW, AH = Level0Builder.AngleH, Bite = 0.004f;
 
             void Mass(float ax0, float az0, float ax1, float az1)
             {
@@ -404,11 +440,6 @@ namespace Backrooms.Generation
                 bb.Box(new Vector3(ax0 - BT, 0f, az1), new Vector3(ax1 + BT, BH, az1 + BT), Level0Builder.UvMetal);
                 bb.Box(new Vector3(ax0 - BT, 0f, az0), new Vector3(ax0, BH, az1), Level0Builder.UvMetal);
                 bb.Box(new Vector3(ax1, 0f, az0), new Vector3(ax1 + BT, BH, az1), Level0Builder.UvMetal);
-                // 壁見切りアングル。木口を壁面ちょうどに置くと黒い筋が抜けるので食い込ませる
-                trim.Box(new Vector3(ax0 - AW, H, az0 - AW), new Vector3(ax1 + AW, H + AH, az0 + Bite), Level0Builder.UvMetal);
-                trim.Box(new Vector3(ax0 - AW, H, az1 - Bite), new Vector3(ax1 + AW, H + AH, az1 + AW), Level0Builder.UvMetal);
-                trim.Box(new Vector3(ax0 - AW, H, az0 - Bite), new Vector3(ax0 + Bite, H + AH, az1 + Bite), Level0Builder.UvMetal);
-                trim.Box(new Vector3(ax1 - Bite, H, az0 - Bite), new Vector3(ax1 + AW, H + AH, az1 + Bite), Level0Builder.UvMetal);
             }
 
             // x 一定の壁。同じ厚みが続く区間はひとまとめにする
@@ -419,10 +450,14 @@ namespace Backrooms.Generation
                 {
                     if (!Level0Layout.WallX(i, j, S)) { j++; continue; }
                     float t = Level0Layout.WallThickX(i, j, S) * 0.5f;
+                    float c = Level0Layout.WallCenterX(i, j, S);
                     int s = j;
+                    // 厚みだけでなく中心も揃っている区間だけをまとめる。
+                    // 厚い壁は 0.3m 振ってあるので、振り方が違えば別の壁。
                     while (j < j1 && Level0Layout.WallX(i, j, S)
-                           && Mathf.Approximately(Level0Layout.WallThickX(i, j, S) * 0.5f, t)) j++;
-                    Mass(i * P - t, s * P, i * P + t, j * P);
+                           && Mathf.Approximately(Level0Layout.WallThickX(i, j, S) * 0.5f, t)
+                           && Mathf.Approximately(Level0Layout.WallCenterX(i, j, S), c)) j++;
+                    Mass(c - t, s * P, c + t, j * P);
                 }
             }
             for (int j = j0; j < j1; j++)
@@ -432,10 +467,12 @@ namespace Backrooms.Generation
                 {
                     if (!Level0Layout.WallZ(i, j, S)) { i++; continue; }
                     float t = Level0Layout.WallThickZ(i, j, S) * 0.5f;
+                    float c = Level0Layout.WallCenterZ(i, j, S);
                     int s = i;
                     while (i < i1 && Level0Layout.WallZ(i, j, S)
-                           && Mathf.Approximately(Level0Layout.WallThickZ(i, j, S) * 0.5f, t)) i++;
-                    Mass(s * P, j * P - t, i * P, j * P + t);
+                           && Mathf.Approximately(Level0Layout.WallThickZ(i, j, S) * 0.5f, t)
+                           && Mathf.Approximately(Level0Layout.WallCenterZ(i, j, S), c)) i++;
+                    Mass(s * P, c - t, i * P, c + t);
                 }
             }
             for (int i = i0; i < i1; i++)
@@ -458,6 +495,100 @@ namespace Backrooms.Generation
             fix.Box(new Vector3(x0, yb, z0 + FrameW), new Vector3(x0 + FrameW, yt, z1 - FrameW), Level0Builder.UvMetal);
             fix.Box(new Vector3(x1 - FrameW, yb, z0 + FrameW), new Vector3(x1, yt, z1 - FrameW), Level0Builder.UvMetal);
             lens.PlaneXZ(x0 + FrameW, x1 - FrameW, z0 + FrameW, z1 - FrameW, H + LensDrop, false, 1f);
+        }
+
+        // -------------------------------------------------------- 天井の変化
+
+        /// <summary>点検口。タイル 1 枚と入れ替わる鋼板の蓋。掛け金が下に出る。</summary>
+        static void EmitHatch(MeshBuilder fix, int ci, int cj, float H)
+        {
+            const float TW = Level0Builder.TBarW, Cell = Level0Layout.Cell;
+            float x0 = ci * Cell + TW * 0.5f, x1 = (ci + 1) * Cell - TW * 0.5f;
+            float z0 = cj * Cell + TW * 0.5f, z1 = (cj + 1) * Cell - TW * 0.5f;
+            fix.Box(new Vector3(x0, H + 0.001f, z0), new Vector3(x1, H + 0.017f, z1),
+                    Level0Builder.UvMetal);
+            float mx = (x0 + x1) * 0.5f;
+            fix.Box(new Vector3(mx - 0.028f, H - 0.005f, z0 + 0.012f),
+                    new Vector3(mx + 0.028f, H + 0.001f, z0 + 0.044f), Level0Builder.UvMetal);
+        }
+
+        /// <summary>
+        /// 空調の吹き出し口。段付きのアルミ製で、タイル 1 枚と入れ替わる。
+        /// 羽根の間から奥が見えるので、裏にダクトぶんの箱を置く。
+        /// 何も置かないと羽根の隙間から世界の外が抜ける。
+        /// </summary>
+        static void EmitVent(MeshBuilder fix, MeshBuilder duct, int ci, int cj, float H)
+        {
+            const float TW = Level0Builder.TBarW, Cell = Level0Layout.Cell;
+            float x0 = ci * Cell + TW * 0.5f, x1 = (ci + 1) * Cell - TW * 0.5f;
+            float z0 = cj * Cell + TW * 0.5f, z1 = (cj + 1) * Cell - TW * 0.5f;
+            duct.BoxInside(new Vector3(x0, H, z0), new Vector3(x1, H + 0.30f, z1), 1f);
+
+            float cx = (x0 + x1) * 0.5f, cz = (z0 + z1) * 0.5f;
+            for (int k = 0; k < 4; k++)
+            {
+                float half = (0.560f - k * 0.120f) * 0.5f;
+                float y = H - 0.002f + k * 0.022f;
+                const float bar = 0.028f;
+                fix.Box(new Vector3(cx - half, y, cz - half),
+                        new Vector3(cx + half, y + 0.018f, cz - half + bar), 0.4f);
+                fix.Box(new Vector3(cx - half, y, cz + half - bar),
+                        new Vector3(cx + half, y + 0.018f, cz + half), 0.4f);
+                fix.Box(new Vector3(cx - half, y, cz - half + bar),
+                        new Vector3(cx - half + bar, y + 0.018f, cz + half - bar), 0.4f);
+                fix.Box(new Vector3(cx + half - bar, y, cz - half + bar),
+                        new Vector3(cx + half, y + 0.018f, cz + half - bar), 0.4f);
+            }
+        }
+
+        /// <summary>
+        /// 抜けたタイル 1 枚。穴の中の天井裏と、床に落ちた本体。
+        ///
+        /// 数を出す物ではない。1 枚あるだけで「この階は誰も手入れしていない」
+        /// と分かる。落ちた本体を置かずに穴だけ開けると、天井に四角い黒が
+        /// 描いてあるようにしか見えない。
+        /// </summary>
+        static void EmitMissingTile(MeshBuilder plenum, MeshBuilder tiles,
+                                    int ci, int cj, float H, int seed)
+        {
+            const float TW = Level0Builder.TBarW, Cell = Level0Layout.Cell;
+            float x0 = ci * Cell + TW * 0.5f, x1 = (ci + 1) * Cell - TW * 0.5f;
+            float z0 = cj * Cell + TW * 0.5f, z1 = (cj + 1) * Cell - TW * 0.5f;
+            plenum.BoxInside(new Vector3(x0, H, z0), new Vector3(x1, H + 0.42f, z1), 1f);
+
+            // 落ちた本体。位置も向きも座標から決める。乱数を持たせると
+            // 同じ場所に戻ってきたとき別の所に落ちていることになる。
+            float r0 = (Level0Layout.Hash(ci, cj, seed * 7 + 71) & 0xFFFF) / 65535f;
+            float r1 = (Level0Layout.Hash(ci, cj, seed * 7 + 72) & 0xFFFF) / 65535f;
+            float r2 = (Level0Layout.Hash(ci, cj, seed * 7 + 73) & 0xFFFF) / 65535f;
+            int ai = (int)(Level0Layout.Hash(ci, cj, seed * 7 + 74) % 8);
+            int aj = (int)(Level0Layout.Hash(ci, cj, seed * 7 + 75) % 8);
+
+            float cx = (x0 + x1) * 0.5f + (r0 - 0.5f) * 0.9f;
+            float cz = (z0 + z1) * 0.5f + (r1 - 0.5f) * 0.9f;
+            float yaw = r2 * Mathf.PI * 2f;
+            float ca = Mathf.Cos(yaw), sa = Mathf.Sin(yaw);
+            const float h = 0.288f;
+            float u0 = (ai + 0.02f) / 8f, u1 = (ai + 0.98f) / 8f;
+            float v0 = (aj + 0.02f) / 8f, v1 = (aj + 0.98f) / 8f;
+
+            Vector3 C(float sx, float sz, float y)
+                => new Vector3(cx + (sx * h * ca - sz * h * sa), y, cz + (sx * h * sa + sz * h * ca));
+
+            // 天井のタイルは -Y を向くのが正しいが、床に落ちた本体は +Y。
+            // 同じ巻き順で張ると裏返り、上から見ると消えて木口だけが残る。
+            var a = C(-1, -1, 0.016f); var b = C(1, -1, 0.019f);
+            var c = C(1, 1, 0.020f); var d = C(-1, 1, 0.014f);
+            tiles.QuadUv(a, d, c, b,
+                         new Vector2(u0, v0), new Vector2(u0, v1),
+                         new Vector2(u1, v1), new Vector2(u1, v0));
+            var a2 = C(-1, -1, 0f); var b2 = C(1, -1, 0f);
+            var c2 = C(1, 1, 0f); var d2 = C(-1, 1, 0f);
+            var e0 = new Vector2(u0, v0); var e1 = new Vector2(u0 + (u1 - u0) * 0.06f, v0);
+            tiles.QuadUv(a2, b2, b, a, e0, e1, e1, e0);
+            tiles.QuadUv(b2, c2, c, b, e0, e1, e1, e0);
+            tiles.QuadUv(c2, d2, d, c, e0, e1, e1, e0);
+            tiles.QuadUv(d2, a2, a, d, e0, e1, e1, e0);
         }
 
         // ------------------------------------------------------------ ちらつき

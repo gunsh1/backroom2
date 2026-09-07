@@ -230,6 +230,38 @@ namespace Backrooms.EditorTools
             res.Shots.Add(new Level0Generator.ShotSpec("I3_far", far1, Level0Layout.BestYaw(far1, world.Seed), -2.27f));
             res.Shots.Add(new Level0Generator.ShotSpec("I4_farther", far2, Level0Layout.BestYaw(far2, world.Seed), -2.27f));
 
+            // 壁と天井の取り合いを正面から見上げるカット。ここに暗い帯が回っていた。
+            // 2.4m ほど手前の壁を探す。近すぎると壁紙しか写らず、遠いと帯が 1px になる。
+            float junYaw = res.SpawnYaw, junBest = 1e9f;
+            for (int a = 0; a < 72; a++)
+            {
+                float rad = a * 5f * Mathf.Deg2Rad;
+                float dx = Mathf.Sin(rad), dz = Mathf.Cos(rad), d = 0.5f;
+                while (d < 12f && !Level0Layout.Solid(spawn.x + dx * d, spawn.z + dz * d, world.Seed))
+                    d += 0.25f;
+                if (d >= 12f) continue;
+                if (Mathf.Abs(d - 2.4f) < junBest) { junBest = Mathf.Abs(d - 2.4f); junYaw = a * 5f; }
+            }
+            res.Shots.Add(new Level0Generator.ShotSpec("I5_junction", spawn, junYaw, -22f));
+
+            // 大部屋の一帯。壁が抜けて柱だけが残る所を 1 枚撮っておく。
+            const int Z = Level0Layout.SpaceZone;
+            int szi = Level0Layout.FloorDiv(Mathf.FloorToInt(spawn.x / Level0Layout.WallPitch), Z);
+            int szj = Level0Layout.FloorDiv(Mathf.FloorToInt(spawn.z / Level0Layout.WallPitch), Z);
+            var hallAt = spawn; float hallD = 1e9f;
+            for (int zi = szi - 5; zi <= szi + 5; zi++)
+                for (int zj = szj - 5; zj <= szj + 5; zj++)
+                {
+                    if (Level0Layout.SpaceAt(zi * Z, zj * Z, world.Seed) != Level0Layout.Space.Hall) continue;
+                    var c = new Vector3((zi * Z + Z * 0.5f) * Level0Layout.WallPitch, 0f,
+                                        (zj * Z + Z * 0.5f) * Level0Layout.WallPitch);
+                    float d = Vector3.Distance(c, spawn);
+                    if (d < hallD) { hallD = d; hallAt = c; }
+                }
+            hallAt = Level0Layout.FindOpen(hallAt, world.Seed, 0.9f);
+            res.Shots.Add(new Level0Generator.ShotSpec(
+                "I6_hall", hallAt, Level0Layout.BestYaw(hallAt, world.Seed), -6f));
+
             // 歩行テストの経路は幅優先で解く。直線で結んだ経由点では必ず壁に当たる。
             var path = Level0Layout.Path(spawn, far1, world.Seed, 0.45f);
             if (path.Count >= 2) res.Walk.AddRange(path);
@@ -258,6 +290,51 @@ namespace Backrooms.EditorTools
             res.Log.Add($"器具の状態 (6400 ベイの標本): 点灯 {lit * 100 / tot}% / "
                         + $"切れ {dead * 100 / tot}% / ちらつき {flk * 100 / tot}% / "
                         + $"器具なし {none * 100 / tot}%");
+
+            // --- 空間の変化 ---------------------------------------------
+            // 「珍しいから効く」ものなので、実際に何割になったかを見ておく。
+            int hall = 0, warren = 0, zarea = 0;
+            for (int i = -40; i < 40; i++)
+                for (int j = -40; j < 40; j++)
+                {
+                    zarea++;
+                    var sp = Level0Layout.SpaceAt(i, j, world.Seed);
+                    if (sp == Level0Layout.Space.Hall) hall++;
+                    else if (sp == Level0Layout.Space.Warren) warren++;
+                }
+            res.Log.Add($"一帯の性格 (面積比): 大部屋 {hall * 100f / zarea:F0}% / "
+                        + $"小割り {warren * 100f / zarea:F0}% / "
+                        + $"標準 {(zarea - hall - warren) * 100f / zarea:F0}%");
+
+            int mis = 0, hat = 0, ven = 0, cells = 0;
+            for (int ci = -120; ci < 120; ci++)
+                for (int cj = -120; cj < 120; cj++)
+                {
+                    cells++;
+                    switch (Level0Layout.CeilAt(ci, cj, world.Seed))
+                    {
+                        case Level0Layout.Ceil.Missing: mis++; break;
+                        case Level0Layout.Ceil.Hatch: hat++; break;
+                        case Level0Layout.Ceil.Vent: ven++; break;
+                    }
+                }
+            float perChunk = ChunkedLevel0.CellsPerChunk * ChunkedLevel0.CellsPerChunk / (float)cells;
+            res.Log.Add($"天井の変化 (14.4m 角のチャンク 1 つあたり): 抜けたタイル {mis * perChunk:F1} 枚 / "
+                        + $"点検口 {hat * perChunk:F1} / 吹き出し口 {ven * perChunk:F1}");
+
+            // 小割りの一帯が区画を塞いでいないか。壁の確率を上げた副作用は
+            // 「行けない場所ができる」形で出るので、実際に経路を解いて確かめる。
+            int reach = 0, tried = 0;
+            for (int a = 0; a < 8; a++)
+            {
+                float ang = a * Mathf.PI * 2f / 8f;
+                var t = Level0Layout.FindOpen(
+                    spawn + new Vector3(Mathf.Cos(ang) * 46f, 0f, Mathf.Sin(ang) * 46f),
+                    world.Seed, 0.9f);
+                tried++;
+                if (Level0Layout.Path(spawn, t, world.Seed, 0.45f).Count >= 2) reach++;
+            }
+            res.Log.Add($"到達性: 46m 先の 8 方向のうち {reach}/{tried} に経路がある");
             return res;
         }
 
@@ -585,20 +662,28 @@ namespace Backrooms.EditorTools
             if (_vhs)
             {
                 var vhs = AddOverride<VhsPostProcess>(profile);
-                // 控えめから始める。掛けすぎると「テープ」ではなく「壊れた描画」に見える。
                 Set(vhs, "intensity", 0.75f);
                 Set(vhs, "lines", 486f);
-                Set(vhs, "lumaBand", 420f);
-                Set(vhs, "chromaBand", 60f);
+                // 帯域は実機の公称値そのものに落とす。420 は「VHS を意識した
+                // 綺麗な絵」で、テープの数字ではなかった。輝度 3.0MHz は
+                // 画面幅あたり約 333 本、色差 0.4MHz は約 40 本。
+                Set(vhs, "lumaBand", 333f);     // 420 -> 333
+                Set(vhs, "chromaBand", 40f);    // 60 -> 40
                 Set(vhs, "chroma", 0.85f);
-                Set(vhs, "desaturate", 0.08f);
-                Set(vhs, "sharpen", 0.10f);
-                Set(vhs, "tape", 0.15f);
-                Set(vhs, "tracking", 0.20f);
+                // 記録できる彩度そのものが低い。テープの色は Y より 2 段浅い。
+                Set(vhs, "desaturate", 0.32f);  // 0.08 -> 0.32
+                Set(vhs, "tint", 0.35f);        // 新規。蛍光灯の緑が残る
+                // アパーチャ補正のリンギング。落とした高域を VCR が無理に
+                // 持ち上げるので、明暗の境に必ず縁が付く。これが一番「テープ」に見える。
+                Set(vhs, "sharpen", 0.32f);     // 0.10 -> 0.32
+                Set(vhs, "tape", 0.30f);        // 0.15 -> 0.30
+                Set(vhs, "tracking", 0.35f);    // 0.20 -> 0.35
+                // 頻度は据え置き。1 本ずつの見え方をシェーダ側で作り直した
+                // (真っ白な棒 -> 1H 遅延の補償が差し込む縞)。
                 Set(vhs, "dropout", 0.10f);
-                Set(vhs, "headSwitch", 0.25f);
-                Set(vhs, "scanline", 0.12f);
-                Set(vhs, "grain", 0.25f);
+                Set(vhs, "headSwitch", 0.35f);  // 0.25 -> 0.35
+                Set(vhs, "scanline", 0.20f);    // 0.12 -> 0.20
+                Set(vhs, "grain", 0.45f);       // 0.25 -> 0.45
                 Set(vhs, "fisheye", 0.40f);     // 0 -> 0.40 (intensity 込みで 0.30)。中央が 21% 膨らむ
                 Set(vhs, "pillarbox", true);
             }

@@ -41,7 +41,10 @@ namespace Backrooms.Post
         public ClampedFloatParameter chroma = new ClampedFloatParameter(1f, 0f, 1f);
 
         [Tooltip("彩度の落ち")]
-        public ClampedFloatParameter desaturate = new ClampedFloatParameter(0.10f, 0f, 0.6f);
+        public ClampedFloatParameter desaturate = new ClampedFloatParameter(0.10f, 0f, 0.8f);
+
+        [Tooltip("蛍光灯の緑かぶり。補正フィルタを持たない民生機は緑-マゼンタ軸を直せない")]
+        public ClampedFloatParameter tint = new ClampedFloatParameter(0.35f, 0f, 1f);
 
         [Tooltip("アパーチャ補正のリンギング")]
         public ClampedFloatParameter sharpen = new ClampedFloatParameter(0.30f, 0f, 1.5f);
@@ -98,6 +101,7 @@ namespace Backrooms.Post
             _mat.SetFloat(ID.ChromaBand, chromaBand.value);
             _mat.SetFloat(ID.Chroma, chroma.value);
             _mat.SetFloat(ID.Desat, desaturate.value);
+            _mat.SetFloat(ID.Tint, tint.value);
             _mat.SetFloat(ID.Sharpen, sharpen.value);
             _mat.SetFloat(ID.Tape, tape.value);
             _mat.SetFloat(ID.Tracking, tracking.value);
@@ -122,6 +126,7 @@ namespace Backrooms.Post
             public static readonly int ChromaBand = Shader.PropertyToID("_ChromaBand");
             public static readonly int Chroma = Shader.PropertyToID("_Chroma");
             public static readonly int Desat = Shader.PropertyToID("_Desat");
+            public static readonly int Tint = Shader.PropertyToID("_Tint");
             public static readonly int Sharpen = Shader.PropertyToID("_Sharpen");
             public static readonly int Tape = Shader.PropertyToID("_Tape");
             public static readonly int Tracking = Shader.PropertyToID("_Tracking");
