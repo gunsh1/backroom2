@@ -61,17 +61,33 @@ namespace Backrooms.Audio
 
 
 
-        /// <summary>その点から各方向の壁までの距離を測る。</summary>
+        /// <summary>
+        /// その点から各方向の壁までの距離を測る。
+        ///
+        /// 粗く進んでから戻って詰める。0.3m 刻みで 45m まで進むと 1 方向
+        /// 150 歩、24 方向で 3600 回の Solid になり、Solid 1 回が 27 回の
+        /// ハッシュなので 1 フレームに 10 万回近く走る。実測で最悪フレームが
+        /// 18.9ms から 36.8ms に伸びていた。壁の最小の厚みは 1.2m あるので
+        /// 0.9m 刻みで跨ぐことはなく、当たった区間だけ 0.3m で詰めれば
+        /// 同じ答えが 1/3 以下の手数で出る。
+        /// </summary>
         public static void March(Vector3 p, int seed, float[] outDist)
         {
+            const float Coarse = 0.9f, Fine = 0.3f;
             int n = outDist.Length;
             for (int a = 0; a < n; a++)
             {
                 float t = a * 2f * Mathf.PI / n;
                 float dx = Mathf.Cos(t), dz = Mathf.Sin(t);
-                // 0.3m 刻み。壁の最小の厚みが 1.2m なので抜けることはない。
-                float d = 0.3f;
-                while (d < MaxDist && !Level0Layout.Solid(p.x + dx * d, p.z + dz * d, seed)) d += 0.3f;
+                float d = Coarse;
+                while (d < MaxDist && !Level0Layout.Solid(p.x + dx * d, p.z + dz * d, seed)) d += Coarse;
+                if (d < MaxDist)
+                {
+                    float back = d - Coarse + Fine;
+                    while (back < d && !Level0Layout.Solid(p.x + dx * back, p.z + dz * back, seed))
+                        back += Fine;
+                    d = back;
+                }
                 outDist[a] = d;
             }
         }

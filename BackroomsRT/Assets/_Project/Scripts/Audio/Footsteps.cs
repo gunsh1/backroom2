@@ -28,6 +28,7 @@ namespace Backrooms.Audio
         AudioSource[] _pool;
         int _next;
         int _pair;
+        int _varL, _varR;
 
         public int Played { get; private set; }
 
@@ -60,17 +61,27 @@ namespace Backrooms.Audio
             if (_fps == null || _pool == null) return;
             if (!_fps.SteppedThisFrame) return;
 
-            int k = _pair * 2 + (_fps.LastStepWasLeft ? 0 : 1);
+            // 同じ足でも 1 歩ずつ波形を変える。直前と同じものは使わない。
+            bool left = _fps.LastStepWasLeft;
+            int v;
+            if (left) { _varL = (_varL + 1 + Random.Range(0, SoundBank.StepVariants - 1))
+                                % SoundBank.StepVariants; v = _varL; }
+            else      { _varR = (_varR + 1 + Random.Range(0, SoundBank.StepVariants - 1))
+                                % SoundBank.StepVariants; v = _varR; }
+            int k = SoundBank.StepIndex(_pair, !left, v);
             var s = _pool[_next];
             _next = (_next + 1) % _pool.Length;
 
             s.clip = SoundBank.Footsteps[k];
             s.pitch = 1f;
             float speed = Mathf.Clamp01(_fps.SpeedNormalized);
-            // 踏み込みの強さ。忍び足と全力で 3 倍ほど違う。
-            float v = Volume * Mathf.Lerp(0.45f, 1.25f, speed);
-            if (_fps.IsCrouching) v *= 0.40f;
-            s.volume = v;
+            // 踏み込みの強さ。忍び足と全力で 3 倍ほど違い、さらに 1 歩ごとに
+            // 1.5dB ばらつく。人はいつも同じ強さで踏まない。音程を振るのと
+            // 違って、強さを振っても体格は変わらない。
+            float vol = Volume * Mathf.Lerp(0.45f, 1.25f, speed)
+                        * (0.84f + Random.value * 0.32f);
+            if (_fps.IsCrouching) vol *= 0.40f;
+            s.volume = vol;
 
             // 等間隔を崩す。歩幅の周期に対して数 % だけ遅らせる。
             float jitter = Random.value * TimingJitter * _fps.StrideSeconds;

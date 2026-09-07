@@ -43,8 +43,9 @@ namespace Backrooms.EditorTools
             DumpClip(dir, "src_ballast_fail.wav", SoundBank.BallastFail, log);
             DumpClip(dir, "src_hvac.wav", SoundBank.Hvac, log);
             DumpClip(dir, "src_roomtone.wav", SoundBank.RoomTone, log);
-            DumpClip(dir, "src_stepL.wav", SoundBank.Footsteps[0], log);
-            DumpClip(dir, "src_stepR.wav", SoundBank.Footsteps[1], log);
+            DumpClip(dir, "src_stepL.wav", SoundBank.Footsteps[SoundBank.StepIndex(0, false, 0)], log);
+            DumpClip(dir, "src_stepL2.wav", SoundBank.Footsteps[SoundBank.StepIndex(0, false, 1)], log);
+            DumpClip(dir, "src_stepR.wav", SoundBank.Footsteps[SoundBank.StepIndex(0, true, 0)], log);
             DumpClip(dir, "src_click.wav", SoundBank.Clicks[0], log);
 
             // ---- 測る場所を間取りから探す --------------------------------
@@ -194,7 +195,11 @@ namespace Backrooms.EditorTools
             return new IrResult { ir = buf, sec = sec, n = n, first = first, last = last };
         }
 
-        /// <summary>足音を部屋に通して、最後にテープを掛ける。耳で聞く用。</summary>
+        /// <summary>
+        /// 足音を部屋に通して、最後にテープを掛ける。耳で聞く用。
+        /// 並べ方は Footsteps.cs と同じ規則にする。左右交互、変種を巡回、
+        /// 間隔と強さをばらつかせる。片方の音を 10 回並べても判断できない。
+        /// </summary>
         static float[] RenderDemo(Spot s)
         {
             var fdn = new Fdn(Fs);
@@ -207,16 +212,23 @@ namespace Backrooms.EditorTools
             early.SetTaps(sec, gain, pan, n);
             for (int i = 0; i < Fs / 10; i++) { float a, b; early.Process(0f, out a, out b); }
 
-            // 4 歩ぶん + 蛍光灯のうなりを薄く
-            int len = Fs * 4;
+            int len = Fs * 7;
             var dry = new float[len];
-            var step = ClipData(SoundBank.Footsteps[0]);
-            var hum = ClipData(SoundBank.Ballast);
-            for (int k = 0; k < 4; k++)
+            var rnd = new System.Random(4242);
+            float stride = 1f / 1.9f;              // 歩幅の周期
+            float t = 0.35f;
+            for (int k = 0; k < 12; k++)
             {
-                int at = Mathf.RoundToInt((0.35f + k * 0.62f) * Fs);
-                for (int i = 0; i < step.Length && at + i < len; i++) dry[at + i] += step[i] * 0.55f;
+                bool right = (k & 1) == 1;
+                var clip = ClipData(SoundBank.Footsteps[
+                    SoundBank.StepIndex(0, right, k % SoundBank.StepVariants)]);
+                float jitter = (float)rnd.NextDouble() * 0.04f * stride;
+                float lvl = 0.55f * (0.84f + (float)rnd.NextDouble() * 0.32f);
+                int at = Mathf.RoundToInt((t + jitter) * Fs);
+                for (int i = 0; i < clip.Length && at + i < len; i++) dry[at + i] += clip[i] * lvl;
+                t += stride;
             }
+            var hum = ClipData(SoundBank.Ballast);
             for (int i = 0; i < len; i++) dry[i] += hum[i % hum.Length] * 0.05f;
 
             var buf = new float[len * 2];
@@ -230,8 +242,8 @@ namespace Backrooms.EditorTools
                 buf[i * 2] = x + (el + rl) * w;
                 buf[i * 2 + 1] = x + (er + rr) * w;
             }
-            var t = new Tape(Fs); t.Amount = 0.7f;
-            t.Process(buf, 2);
+            var tp = new Tape(Fs); tp.Amount = 0.7f;
+            tp.Process(buf, 2);
             return buf;
         }
 

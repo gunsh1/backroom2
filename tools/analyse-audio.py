@@ -168,7 +168,7 @@ def main():
 
     print()
     print('=== 足音の作り ===')
-    for name in ('src_stepL.wav', 'src_stepR.wav'):
+    for name in ('src_stepL.wav', 'src_stepL2.wav', 'src_stepR.wav'):
         p = os.path.join(AUD, name)
         if not os.path.exists(p):
             print('  %-14s (無い)' % name)
@@ -197,6 +197,17 @@ def main():
               % (name, (ti - st) / sr * 1000, ti / sr * 1000, toe,
                  x.std(), len(x) / sr * 1000))
         print('%-16s 包絡 (20ms 刻み, 0-9): %s' % ('', prof))
+
+    # 同じ足の 2 歩が本当に違う波形か。1 に近ければ同じものを鳴らしている。
+    pa = os.path.join(AUD, 'src_stepL.wav')
+    pb = os.path.join(AUD, 'src_stepL2.wav')
+    if os.path.exists(pa) and os.path.exists(pb):
+        a, sr = read(pa)
+        bb, _ = read(pb)
+        m = min(len(a), len(bb))
+        a, bb = a[:m], bb[:m]
+        c = float(np.dot(a, bb) / (np.linalg.norm(a) * np.linalg.norm(bb) + 1e-12))
+        print('  左足の 1 歩目と 2 歩目の相関 %.3f (1.0 なら同じ波形)' % c)
 
     print()
     print('=== 部屋のインパルス応答 ===')

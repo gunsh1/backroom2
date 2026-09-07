@@ -31,7 +31,7 @@ namespace Backrooms.Player
         public float PitchLimit = 85f;
 
         [Header("歩行に伴う視点の揺れ（控えめに）")]
-        public float StepFrequency = 1.9f;   // Hz
+        public float StepFrequency = 1.9f;   // 歩/秒。1.4m/s なら歩幅 0.74m
         public float BobVertical = 0.012f;   // m
         public float BobLateral = 0.008f;    // m
         public float BobRoll = 0.28f;        // deg
@@ -194,7 +194,11 @@ namespace Backrooms.Player
             float freq = StepFrequency * Mathf.Lerp(1f, 1.45f, IsSprinting ? 1f : 0f);
 
             float prevPhase = _bobPhase;
-            _bobPhase += Time.deltaTime * freq * Mathf.PI * 2f * moving;
+            // 位相は 1 歩あたり pi 進める。2pi にすると半周ごとの判定が
+            // 1 秒に 2 倍の回数当たり、StepFrequency という名前に反して
+            // 3.8 歩/秒になる。1.4m/s で割ると歩幅 0.37m のすり足で、
+            // 実際に「タタッタタッ」と聞こえていた。人の歩幅は 0.7〜0.75m。
+            _bobPhase += Time.deltaTime * freq * Mathf.PI * moving;
 
             // 半周ごとに 1 歩。足音とカメラの沈み込みを同じ位相で扱う。
             if (Mathf.FloorToInt(prevPhase / Mathf.PI) != Mathf.FloorToInt(_bobPhase / Mathf.PI) && moving > 0.1f)

@@ -110,13 +110,21 @@ namespace Backrooms.Audio
                     if (!Level0Layout.HasFixture(i, j, Seed)) continue;
                     var st = Level0Layout.LampAt(i, j, Seed);
                     if (st == Level0Layout.Lamp.Dead) continue;      // 切れた管は鳴らない
-                    if (!Level0Layout.FixtureFree(i, j, Seed)) continue;
                     var p = Level0Layout.FixtureCenter(i, j);
                     float d2 = (p - ear).sqrMagnitude;
                     if (d2 > r2) continue;
                     _found.Add((d2, new Vector2Int(i, j), p, st == Level0Layout.Lamp.Flicker));
                 }
             _found.Sort((a, b) => a.d.CompareTo(b.d));
+
+            // FixtureFree は 1 回で 36 マスを見る。候補 200 台すべてに掛けると
+            // 0.3 秒ごとに大きな山ができる。並べ替えたあと、必要な数だけ調べる。
+            for (int k = 0; k < _found.Count && k < Voices * 3; k++)
+                if (!Level0Layout.FixtureFree(_found[k].bay.x, _found[k].bay.y, Seed))
+                    _found[k] = (float.MaxValue, _found[k].bay, _found[k].p, _found[k].fail);
+            _found.Sort((a, b) => a.d.CompareTo(b.d));
+            while (_found.Count > 0 && _found[_found.Count - 1].d == float.MaxValue)
+                _found.RemoveAt(_found.Count - 1);
 
             int n = Mathf.Min(Voices, _found.Count);
             Assigned = n; Occluded = 0;
