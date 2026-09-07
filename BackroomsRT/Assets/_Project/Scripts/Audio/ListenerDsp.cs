@@ -26,6 +26,12 @@ namespace Backrooms.Audio
         [Header("量")]
         [Range(0f, 1f)] public float ReverbAmount = 1f;
         [Range(0f, 1f)] public float TapeAmount = 0.7f;
+        /// <summary>
+        /// 最終的な音量。カムコーダの AGC が狙う実効値そのもの。
+        /// うるさい／小さいはここだけ動かせばよい。個別の音量は
+        /// Mix が実測の音圧から比で決めている。
+        /// </summary>
+        [Range(0.002f, 0.20f)] public float OutputLevel = Mix.Output;
         public bool Enabled = true;
 
         /// <summary>直前に測った部屋。ログと検証用。</summary>
@@ -167,6 +173,7 @@ namespace Backrooms.Audio
             _wetLive = wetTarget;
 
             _tape.Amount = TapeAmount;
+            _tape.AgcTarget = OutputLevel;
             _tape.Process(data, channels);
             TapeGain = _tape.CurrentGain;
 

@@ -167,6 +167,38 @@ def main():
               % ('', step, typ, step / max(typ, 1e-12)))
 
     print()
+    print('=== 足音の作り ===')
+    for name in ('src_stepL.wav', 'src_stepR.wav'):
+        p = os.path.join(AUD, name)
+        if not os.path.exists(p):
+            print('  %-14s (無い)' % name)
+            continue
+        x, sr = read(p)
+        # 包絡。1 歩に「かかと」と「蹴り出し」の 2 つ山があるか
+        env = np.abs(signal.hilbert(x))
+        w = int(0.018 * sr)
+        env = np.convolve(env, np.ones(w) / w, mode='same')
+        # 山の数を数えると減衰中の揺らぎを拾う。包絡そのものを 20ms 刻みで
+        # 出したほうが確か。かかとの山、いったん落ちて、蹴り出しの山、が見える。
+        bins = [env[int(t * sr):int((t + 0.02) * sr)].max()
+                for t in np.arange(0, len(x) / sr - 0.02, 0.02)]
+        top = max(bins)
+        prof = ''.join('%d' % min(9, int(round(v / top * 9))) for v in bins)
+        # 立ち上がり: 頂点の 10% から頂点まで
+        ti = int(np.argmax(env))
+        st = ti
+        while st > 0 and env[st] > env[ti] * 0.1:
+            st -= 1
+        # 蹴り出し: 80ms より後で一番強いところ
+        after = env[int(0.08 * sr):]
+        toe = (int(np.argmax(after)) + int(0.08 * sr)) / sr * 1000
+        print('  %-14s 立ち上がり %.1f ms  かかと %.0f ms  蹴り出し %.0f ms  '
+              'rms %.4f  長さ %.0f ms'
+              % (name, (ti - st) / sr * 1000, ti / sr * 1000, toe,
+                 x.std(), len(x) / sr * 1000))
+        print('%-16s 包絡 (20ms 刻み, 0-9): %s' % ('', prof))
+
+    print()
     print('=== 部屋のインパルス応答 ===')
     print('%-8s %8s %8s %8s %8s   %s' %
           ('場所', 'RT60', 'RT60(500)', 'RT60(4k)', 'hf比', '初期反射のピーク (ms)'))

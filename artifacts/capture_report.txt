@@ -6,15 +6,16 @@ output             : 1440x1080
 lightmaps          : 0
 shots              : 4 (from CaptureRoute)
 chunks             : 81  (14.4 m each)
-audio              : 48000 Hz  ブロック 158 回
+audio              : 48000 Hz  ブロック 126 回
 room               : 床 418 m2  RT60 0.534 s  hf比 0.67  室定数 654  wet 0.23
 area lights        : 1115 個  うち点灯 225  上限 450
 shot: I1_spawn  pos=(0.90, 0.00, 0.90) yaw=145 pitch=-2.27
 shot: I2_ceiling  pos=(0.90, 0.00, 0.90) yaw=170 pitch=-26
 shot: I3_far  pos=(37.10, 0.00, 25.10) yaw=325 pitch=-2.27
 shot: I4_farther  pos=(-30.90, 0.00, 61.10) yaw=335 pitch=-2.27
-fps: avg=100.1  worst frame=10.9 ms  (180 frames)   [1440x1080]
-walk: reached 5/15 waypoints in 49.3 s, travelled 68.8 m  STUCK before waypoint 6 at (19.21, 0.08, 29.39)
-walk frames: avg=74.0 fps  worst=26.9 ms  20ms超え 4/3646  チャンク 91..99  同時ライト最大 343  上限張り付き 0/3646
+fps: avg=97.7  worst frame=13.7 ms  (180 frames)   [1440x1080]
+walk: reached 5/15 waypoints in 49.3 s, travelled 68.8 m  STUCK before waypoint 6 at (19.20, 0.08, 29.39)
+walk agc: 1.21 〜 3.21 倍  (上限 5.0)
+walk frames: avg=76.7 fps  worst=20.5 ms  20ms超え 1/3778  チャンク 91..99  同時ライト最大 343  上限張り付き 0/3778
 audio live         : ../artifacts/audio/live.wav
-audio sources      : 足音 186 回  器具 8 台 (壁越し 0)  AGC 2.93
+audio sources      : 足音 186 回  器具 8 台 (壁越し 0)  AGC 1.73

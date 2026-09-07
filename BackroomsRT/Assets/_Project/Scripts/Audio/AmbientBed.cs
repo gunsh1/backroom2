@@ -12,8 +12,8 @@ namespace Backrooms.Audio
     [DisallowMultipleComponent]
     public class AmbientBed : MonoBehaviour
     {
-        public float HvacVolume = 0.16f;
-        public float ToneVolume = 0.05f;
+        public float HvacVolume = Mix.Hvac;
+        public float ToneVolume = Mix.Tone;
 
         AudioSource _hvac, _tone;
 

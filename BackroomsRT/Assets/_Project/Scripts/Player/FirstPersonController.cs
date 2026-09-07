@@ -42,6 +42,17 @@ namespace Backrooms.Player
         public float SpeedNormalized { get; private set; }
         /// <summary>接地した瞬間に立つフラグ。足音のトリガに使う。</summary>
         public bool SteppedThisFrame { get; private set; }
+        /// <summary>いま踏んだのが左足か。足音を左右で撃ち分けるのに使う。</summary>
+        public bool LastStepWasLeft { get { return _lastStepWasLeft; } }
+        /// <summary>いまの歩幅の周期 (秒)。踏む間隔をゆらすのに使う。</summary>
+        public float StrideSeconds
+        {
+            get
+            {
+                float f = StepFrequency * (IsSprinting ? 1.45f : 1f);
+                return f > 0.01f ? 1f / f : 0.5f;
+            }
+        }
 
         /// <summary>
         /// 自動テスト用の入力差し込み口。これを立てるとキーボードとマウスを

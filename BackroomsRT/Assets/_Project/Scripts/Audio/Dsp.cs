@@ -343,10 +343,10 @@ namespace Backrooms.Audio
         uint _rng = 0x9E3779B1;
 
         public float Amount = 1f;          // 全体の掛かり具合
-        public float Hiss = 0.0018f;       // ヒスの振幅
+        public float Hiss = Mix.Hiss;      // ヒスの振幅
         public float WowPercent = 0.15f;   // ピッチ揺れ (%)
-        public float AgcTarget = 0.14f;    // AGC が狙う実効値
-        public float AgcMaxGain = 6f;
+        public float AgcTarget = Mix.Output;   // AGC が狙う実効値 = 最終的な音量
+        public float AgcMaxGain = Mix.AgcMaxGain;
 
         public Tape(float sampleRate)
         {

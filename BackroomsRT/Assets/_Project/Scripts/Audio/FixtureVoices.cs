@@ -24,7 +24,8 @@ namespace Backrooms.Audio
         public int Voices = 8;
         [Tooltip("この距離までの器具を候補にする (m)")]
         public float Range = 13f;
-        public float Volume = 0.20f;
+        [Tooltip("器具 1 台。Mix に導出がある")]
+        public float Volume = Mix.Ballast;
         public float MinDistance = 1.4f;
         [Tooltip("壁越しの器具をどこまで落とすか")]
         public float OccludedVolume = 0.32f;
@@ -164,8 +165,9 @@ namespace Backrooms.Audio
                     vo.NextClick = Time.unscaledTime + 0.7f + Random.value * 4.5f;
                     _clickSrc.transform.position = f.p;
                     _clickSrc.pitch = 0.85f + Random.value * 0.35f;
+                    // 点灯管が弾く音はうなりより大きいが、0.30 は基準から外れていた
                     _clickSrc.PlayOneShot(SoundBank.Clicks[Random.Range(0, SoundBank.Clicks.Length)],
-                                          0.30f);
+                                          Volume * 3f);
                 }
             }
             for (int v = 0; v < _voices.Count; v++)

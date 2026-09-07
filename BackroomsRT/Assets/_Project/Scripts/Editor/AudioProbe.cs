@@ -43,7 +43,8 @@ namespace Backrooms.EditorTools
             DumpClip(dir, "src_ballast_fail.wav", SoundBank.BallastFail, log);
             DumpClip(dir, "src_hvac.wav", SoundBank.Hvac, log);
             DumpClip(dir, "src_roomtone.wav", SoundBank.RoomTone, log);
-            DumpClip(dir, "src_step.wav", SoundBank.Footsteps[0], log);
+            DumpClip(dir, "src_stepL.wav", SoundBank.Footsteps[0], log);
+            DumpClip(dir, "src_stepR.wav", SoundBank.Footsteps[1], log);
             DumpClip(dir, "src_click.wav", SoundBank.Clicks[0], log);
 
             // ---- 測る場所を間取りから探す --------------------------------

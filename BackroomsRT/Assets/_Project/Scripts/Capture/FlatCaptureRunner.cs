@@ -195,7 +195,7 @@ namespace Backrooms.Capture
             // 歩きながら実際の出力を録る。合成した素材が本当に鳴り、
             // 残響とテープを通って出ているかは、これを測らないと分からない。
             if (dsp != null) dsp.StartRecord(6f);
-            yield return WalkTest(fps, route, culler, world);
+            yield return WalkTest(fps, route, culler, world, dsp);
             if (dsp != null)
             {
                 try
@@ -220,7 +220,7 @@ namespace Backrooms.Capture
         /// コライダ・開口の有効幅・敷居の段差のどれかが引っ掛かれば止まる。
         /// </summary>
         IEnumerator WalkTest(FirstPersonController fps, CaptureRoute route, LightCuller culler,
-                             ChunkedLevel0 world)
+                             ChunkedLevel0 world, ListenerDsp dspRef)
         {
             if (route == null || route.Waypoints == null || route.Waypoints.Length < 2)
             {
@@ -242,6 +242,7 @@ namespace Backrooms.Capture
             float wWorst = 0f, wTotal = 0f;
             int wFrames = 0, hitch = 0, chMin = int.MaxValue, chMax = 0;
             int ltMax = 0, satFrames = 0;
+            float agcLo = float.MaxValue, agcHi = 0f;
 
             for (int k = 1; k < wp.Length; k++)
             {
@@ -281,6 +282,12 @@ namespace Backrooms.Capture
                         ltMax = Mathf.Max(ltMax, culler.ActiveCount);
                         if (culler.Saturated) satFrames++;
                     }
+                    if (dspRef != null)
+                    {
+                        float g = dspRef.TapeGain;
+                        if (g < agcLo) agcLo = g;
+                        if (g > agcHi) agcHi = g;
+                    }
                 }
                 fps.ExternalMove = new Vector2(0f, 1f);
                 var d = wp[k] - fps.transform.position; d.y = 0f;
@@ -295,6 +302,9 @@ namespace Backrooms.Capture
             _log.Add($"walk: reached {reached}/{wp.Length - 1} waypoints in {dt:F1} s, "
                      + $"travelled {travelled:F1} m"
                      + (stuckAt >= 0 ? $"  STUCK before waypoint {stuckAt} at {fps.transform.position}" : "  OK"));
+            if (dspRef != null && agcHi > 0f)
+                _log.Add(string.Format("walk agc: {0:F2} 〜 {1:F2} 倍  (上限 {2:F1})",
+                                       agcLo, agcHi, Mix.AgcMaxGain));
             if (wFrames > 0)
                 _log.Add($"walk frames: avg={wFrames / Mathf.Max(wTotal, 1e-4f):F1} fps  "
                          + $"worst={wWorst * 1000f:F1} ms  20ms超え {hitch}/{wFrames}  "

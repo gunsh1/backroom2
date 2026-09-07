@@ -19,7 +19,8 @@ namespace Backrooms.Audio
     /// </summary>
     public static class SoundBank
     {
-        public const int Steps = 6;      // 足音の種類
+        public const int StepPairs = 3;  // 靴の種類。1 組が左右 2 つ
+        public const int Steps = StepPairs * 2;
 
         public static AudioClip Ballast { get; private set; }
         public static AudioClip BallastFail { get; private set; }
@@ -42,9 +43,14 @@ namespace Backrooms.Audio
             Hvac = Clip("Snd_Hvac", HvacBed(4.0f, seed + 11));
             RoomTone = Clip("Snd_RoomTone", Tone(4.0f, seed + 23));
 
+            // 左右で 1 組。組の中では同じ靴なので基本の高さと傾きを共有し、
+            // 左右は踏み方の差ぶんだけずらす。組ごとの違いのほうを大きくとる。
             Footsteps = new AudioClip[Steps];
-            for (int i = 0; i < Steps; i++)
-                Footsteps[i] = Clip("Snd_Step" + i, Footstep(seed + 100 + i * 13));
+            for (int i = 0; i < StepPairs; i++)
+            {
+                Footsteps[i * 2] = Clip("Snd_StepL" + i, Footstep(seed + 100 + i * 37, false));
+                Footsteps[i * 2 + 1] = Clip("Snd_StepR" + i, Footstep(seed + 100 + i * 37, true));
+            }
 
             Clicks = new AudioClip[3];
             for (int i = 0; i < 3; i++)
@@ -210,38 +216,73 @@ namespace Backrooms.Audio
         }
 
         /// <summary>
-        /// カーペットの上の足音。硬い床と違って立ち上がりが鈍く、
-        /// 低い「ドス」と、毛足を擦る高い成分に分かれる。
+        /// カーペットの上の足音。
+        ///
+        /// 1 歩は 1 発ではない。かかとが接地し、体重が乗って足裏が転がり、
+        /// 100〜150ms 後につま先で蹴り出す。この 2 段が無いと足ではなく
+        /// 太鼓に聞こえる。
+        ///
+        /// 立ち上がりも瞬間ではない。毛足と下地が 10〜20ms かけて潰れるので、
+        /// 波形の頭は鈍い。ここを立てると同じ素材でも硬い床の音になる。
+        /// 下地はコンクリートなので床鳴りの共振は無く、低い成分は
+        /// 衝撃そのものの音しか出ない。
+        ///
+        /// right で左右を分ける。同じ靴なので基本の高さは共有し、
+        /// 踏み込みの強さと毛足の擦れ方だけを変える。
         /// </summary>
-        static float[] Footstep(int seed)
+        static float[] Footstep(int seed, bool right)
         {
-            int n = Mathf.RoundToInt(0.22f * _fs);
+            int n = Mathf.RoundToInt(0.34f * _fs);
             var b = new float[n];
             var rng = new Rng(seed);
 
-            float pitch = 78f * (0.88f + 0.24f * rng.Unit());
-            float wb = 2f * Mathf.PI * pitch / _fs;
-            float tb = 0.040f * _fs;
-            for (int i = 0; i < n; i++)
-                b[i] += 0.55f * Mathf.Sin(wb * i) * Mathf.Exp(-i / tb);
+            // 靴 1 足ぶんの性格。組の中では共有する。
+            float f0 = 66f + rng.Unit() * 26f;              // 衝撃の基本の高さ
+            float toeAt = 0.105f + rng.Unit() * 0.045f;     // 蹴り出しまでの間
+            float rustle = 0.09f + rng.Unit() * 0.06f;      // 毛足の擦れの量
+            // 左右差。利き足のぶんだけ片方が強い。
+            float side = right ? 0.93f : 1.0f;
+            float sideRustle = right ? 1.12f : 0.95f;
 
-            var body = new float[n];
-            for (int i = 0; i < n; i++) body[i] = rng.Bi();
-            Lp(body, 330f);
-            float t1 = 0.035f * _fs;
-            for (int i = 0; i < n; i++) body[i] *= Mathf.Exp(-i / t1);
-            Normalize(body, 0.9f);
+            void Hit(int at, float lvl, float atkMs, float decMs, float bodyHz, float rus)
+            {
+                int len = Mathf.Min(n - at, Mathf.RoundToInt(0.18f * _fs));
+                if (len <= 0) return;
+                float ta = atkMs * 0.001f * _fs, td = decMs * 0.001f * _fs;
 
-            var scuff = new float[n];
-            for (int i = 0; i < n; i++) scuff[i] = rng.Bi();
-            Lp(scuff, 6000f); Hp(scuff, 2000f);
-            float at = 0.010f * _fs, t2 = 0.055f * _fs;
-            for (int i = 0; i < n; i++)
-                scuff[i] *= (1f - Mathf.Exp(-i / at)) * Mathf.Exp(-i / t2);
-            Normalize(scuff, 0.28f * (0.7f + 0.6f * rng.Unit()));
+                // 衝撃。毛足が潰れる音なので低域に寄る。
+                var imp = new float[len];
+                for (int i = 0; i < len; i++) imp[i] = rng.Bi();
+                Lp(imp, 230f);
+                Normalize(imp, 1f);
+                float wb = 2f * Mathf.PI * bodyHz / _fs;
+                for (int i = 0; i < len; i++)
+                {
+                    float env = (1f - Mathf.Exp(-i / ta)) * Mathf.Exp(-i / td);
+                    b[at + i] += (imp[i] * 0.75f + Mathf.Sin(wb * i) * 0.35f) * env * lvl;
+                }
 
-            for (int i = 0; i < n; i++) b[i] += body[i] + scuff[i];
-            // 頭と尻に短い窓を掛けて、切り口が鳴らないようにする
+                // 毛足が擦れる音。短く、上のほうだけ。
+                var sc = new float[len];
+                for (int i = 0; i < len; i++) sc[i] = rng.Bi();
+                Lp(sc, 7000f); Hp(sc, 1500f);
+                Normalize(sc, 1f);
+                float sa = 0.004f * _fs, sd = 0.026f * _fs;
+                for (int i = 0; i < len; i++)
+                {
+                    float env = (1f - Mathf.Exp(-i / sa)) * Mathf.Exp(-i / sd);
+                    b[at + i] += sc[i] * env * rus * lvl;
+                }
+            }
+
+            // かかとの接地。減衰 45ms では蹴り出しが尾に埋もれた。カーペットに
+            // コンクリート下地は非常によく減衰するので、衝撃音そのものは
+            // 20〜30ms で消える。0.5 秒の響きは部屋が付けるもので床の音ではない。
+            Hit(0, side, 9f, 28f, f0, rustle * sideRustle);
+            // 蹴り出し。軽く、少し高く、擦れの割合が増える。
+            Hit(Mathf.RoundToInt(toeAt * _fs), side * 0.30f, 6f, 20f, f0 * 1.22f,
+                rustle * sideRustle * 1.8f);
+
             int e = Mathf.RoundToInt(0.004f * _fs);
             for (int i = 0; i < e; i++) { b[i] *= i / (float)e; b[n - 1 - i] *= i / (float)e; }
             Normalize(b, 0.75f);

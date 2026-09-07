@@ -5,7 +5,8 @@
   src_ballast_fail.wav       0.50s  peak 0.550  rms 0.2037
   src_hvac.wav               4.00s  peak 0.600  rms 0.1465
   src_roomtone.wav           4.00s  peak 0.350  rms 0.1037
-  src_step.wav               0.22s  peak 0.750  rms 0.1121
+  src_stepL.wav              0.34s  peak 0.750  rms 0.0984
+  src_stepR.wav              0.34s  peak 0.750  rms 0.0973
   src_click.wav              0.05s  peak 0.700  rms 0.0979
 候補 113 点  床面積 34 〜 798 m2
 
