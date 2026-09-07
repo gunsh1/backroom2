@@ -54,3 +54,6 @@ artifacts/*.log
 artifacts/*.json
 artifacts/sheet_*.png
 artifacts/hdrp_asset_properties.txt
+
+# 音の検証用に書き出した WAV。再現できるので追跡しない
+artifacts/audio/*.wav

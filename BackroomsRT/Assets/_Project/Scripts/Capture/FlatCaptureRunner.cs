@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
+using Backrooms.Audio;
 using Backrooms.Generation;
 using Backrooms.Player;
 
@@ -71,6 +72,7 @@ namespace Backrooms.Capture
             var culler = FindFirstObjectByType<LightCuller>();
             var route = FindFirstObjectByType<CaptureRoute>();
             var world = FindFirstObjectByType<ChunkedLevel0>();
+            var dsp = FindFirstObjectByType<ListenerDsp>();
             var shots = (route != null && route.Shots != null && route.Shots.Length > 0)
                         ? route.Shots : Fallback;
             if (fps == null || cam == null)
@@ -102,6 +104,19 @@ namespace Backrooms.Capture
             if (world != null)
                 _log.Add("chunks             : " + world.LoadedChunks
                          + "  (" + ChunkedLevel0.ChunkSize.ToString("F1") + " m each)");
+            if (dsp != null)
+            {
+                var e = dsp.Room;
+                _log.Add("audio              : " + dsp.SampleRate + " Hz  "
+                         + "ブロック " + dsp.Blocks + " 回"
+                         + (dsp.Blocks > 0 ? "" : "  << 音声スレッドが回っていない"));
+                _log.Add("room               : 床 " + e.FloorArea.ToString("F0") + " m2  "
+                         + "RT60 " + e.Rt60.ToString("F3") + " s  hf比 " + e.HfRatio.ToString("F2")
+                         + "  室定数 " + e.RoomConstant.ToString("F0")
+                         + "  wet " + e.Wet.ToString("F2"));
+            }
+            else _log.Add("audio              : ListenerDsp が無い");
+
             if (culler != null)
             {
                 culler.RefreshNow();
@@ -177,7 +192,25 @@ namespace Backrooms.Capture
             _log.Add($"fps: avg={avg:F1}  worst frame={worst * 1000f:F1} ms  ({FpsFrames} frames)"
                      + $"   [{Width}x{Height}]");
 
+            // 歩きながら実際の出力を録る。合成した素材が本当に鳴り、
+            // 残響とテープを通って出ているかは、これを測らないと分からない。
+            if (dsp != null) dsp.StartRecord(6f);
             yield return WalkTest(fps, route, culler, world);
+            if (dsp != null)
+            {
+                try
+                {
+                    dsp.StopRecord("../artifacts/audio/live.wav");
+                    _log.Add("audio live         : ../artifacts/audio/live.wav");
+                }
+                catch (System.Exception e) { _log.Add("audio live 失敗: " + e.Message); }
+                var steps = FindFirstObjectByType<Footsteps>();
+                var voices = FindFirstObjectByType<FixtureVoices>();
+                _log.Add("audio sources      : 足音 " + (steps != null ? steps.Played : -1) + " 回  "
+                         + "器具 " + (voices != null ? voices.Assigned : -1) + " 台 "
+                         + "(壁越し " + (voices != null ? voices.Occluded : -1) + ")  "
+                         + "AGC " + (dsp != null ? dsp.TapeGain.ToString("F2") : "-"));
+            }
             Finish();
         }
 

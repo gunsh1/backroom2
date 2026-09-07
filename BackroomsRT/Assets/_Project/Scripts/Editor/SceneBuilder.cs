@@ -11,6 +11,7 @@ using Backrooms.Capture;
 using Backrooms.Generation;
 using Backrooms.Player;
 using Backrooms.Post;
+using Backrooms.Audio;
 
 namespace Backrooms.EditorTools
 {
@@ -42,6 +43,7 @@ namespace Backrooms.EditorTools
         static Color _mediumGain = Color.white;
         static float _lookAhead = 0f;
         static bool _vhs = false;        // VHS ポストを載せるか
+        static bool _audio = false;      // 音を載せるか
         static float _aspect = 16f / 9f;  // 記録媒体の縦横比
         static int _outW = 1920, _outH = 1080;
 
@@ -54,7 +56,7 @@ namespace Backrooms.EditorTools
             _expComp = 1.98f;
             _lensK1 = 0f; _blurSigma = 0f; _glare = 0f; _glareSigma = 0f;
             _mediumGain = Color.white;
-            _vhs = false; _aspect = 16f / 9f; _outW = 1920; _outH = 1080;
+            _vhs = false; _audio = false; _aspect = 16f / 9f; _outW = 1920; _outH = 1080;
             BuildWith(null);
         }
 
@@ -89,7 +91,7 @@ namespace Backrooms.EditorTools
             _glare = Level0Replica.Glare;
             _glareSigma = Level0Replica.GlareSigma;
             _mediumGain = Level0Replica.MediumGain;
-            _vhs = false; _aspect = 16f / 9f; _outW = 1920; _outH = 1080;
+            _vhs = false; _audio = false; _aspect = 16f / 9f; _outW = 1920; _outH = 1080;
             BuildWith(Level0Replica.Build);
         }
 
@@ -123,6 +125,7 @@ namespace Backrooms.EditorTools
             _lensK1 = 0f; _blurSigma = 0f; _glare = 0f; _glareSigma = 0f;
             _mediumGain = Color.white;
             _vhs = true;
+            _audio = true;
             EnsureVhsRegistered();
             BuildWith(InfiniteWorld);
         }
@@ -204,6 +207,15 @@ namespace Backrooms.EditorTools
             culler.MaxActive = _maxActiveLights;
             culler.Radius = _lightRadius;
             culler.LookAhead = _lookAhead;
+
+            if (_audio)
+            {
+                // 空調は位置を持たない。天井裏を建物じゅうに走っているので
+                // どこか 1 点から聞こえるものではない。
+                root.AddComponent<AmbientBed>();
+                var fv = root.AddComponent<FixtureVoices>();
+                fv.Seed = world.Seed;
+            }
 
             // 無限に続く以上、立ち位置も向きも自分で解かないと壁を撮ることになる。
             // 半径 0.9m の円が入る場所を探し、そこから最も遠くまで見通せる向きを選ぶ。
@@ -636,6 +648,7 @@ namespace Backrooms.EditorTools
             // 胸の高さ (1.345m) なので、身長はそのままに EyeOffset で下げる。
             player.GetComponent<FirstPersonController>().EyeOffset
                 = _eyeH - player.GetComponent<FirstPersonController>().StandHeight;
+            if (_audio) player.AddComponent<Footsteps>();
 
             var camGo = new GameObject("MainCamera");
             camGo.transform.SetParent(head.transform, false);
@@ -653,6 +666,15 @@ namespace Backrooms.EditorTools
             cam.farClipPlane = 80f;
             cam.allowHDR = true;
             camGo.tag = "MainCamera";
+            if (_audio)
+            {
+                camGo.AddComponent<AudioListener>();
+                var dsp = camGo.AddComponent<ListenerDsp>();
+                dsp.Seed = 1996;
+                dsp.EyeHeight = _eyeH;
+                dsp.ReverbAmount = 1f;
+                dsp.TapeAmount = 0.7f;
+            }
             // 描画先が何であれ 4:3 で描く。ウィンドウ比率のままだと
             // VHS 側で 4:3 の窓に詰め直したときに縦長に潰れる。
             camGo.AddComponent<FixedAspect>().Aspect = _aspect;
