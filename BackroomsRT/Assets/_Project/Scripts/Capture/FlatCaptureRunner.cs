@@ -89,6 +89,16 @@ namespace Backrooms.Capture
                 Width = route.Width; Height = route.Height;
             }
 
+            // 測っている間はキーを見ない。GUI モードの Unity が前面を取るので、
+            // その間に打たれた E をそのまま拾ってしまい、fps を測っている
+            // 最中にイベントが走って別物の数字が出る (実測 20 回拾った)。
+            var shoutRef = FindFirstObjectByType<Shout>();
+            if (shoutRef != null) shoutRef.AcceptKey = false;
+            // 抽選も止める。fps を測っている最中に当たると数字が別物になる。
+            // イベントは PanicTest が明示的に起こす。
+            var panicRef = FindFirstObjectByType<Player.PanicEvent>();
+            if (panicRef != null) panicRef.AutoRoll = false;
+
             _log.Add("=== capture ===");
             _log.Add("graphicsDeviceType : " + SystemInfo.graphicsDeviceType);
             _log.Add("graphicsDeviceName : " + SystemInfo.graphicsDeviceName);
@@ -223,7 +233,117 @@ namespace Backrooms.Capture
                             : ""));
             }
             yield return BreathTest(fps);
+            yield return BreathCostTest();
+            yield return PanicTest(dsp);
             Finish();
+        }
+
+        /// <summary>
+        /// 呼吸の流し込みを止めた前後で fps を比べる。
+        ///
+        /// Ola を入れてから fps が 89.5 -> 74.2 に落ちた。音声スレッドの
+        /// 処理が本編の速さに効くはずはないので、どこで食っているかを
+        /// 憶測ではなく A/B で切り分ける。
+        /// </summary>
+        IEnumerator BreathCostTest()
+        {
+            var br = FindFirstObjectByType<Breathing>();
+            if (br == null) yield break;
+
+            float on = 0f, off = 0f;
+            const int N = 150;
+            br.SetStreaming(true);
+            for (int i = 0; i < 20; i++) yield return null;
+            for (int i = 0; i < N; i++) { yield return null; on += Time.unscaledDeltaTime; }
+            br.SetStreaming(false);
+            for (int i = 0; i < 20; i++) yield return null;
+            for (int i = 0; i < N; i++) { yield return null; off += Time.unscaledDeltaTime; }
+            br.SetStreaming(true);
+
+            _log.Add(string.Format(
+                "breath cost: 流し込みあり {0:F1} fps / 止めると {1:F1} fps  (差 {2:F2} ms/frame)",
+                N / Mathf.Max(on, 1e-4f), N / Mathf.Max(off, 1e-4f),
+                (on - off) / N * 1000f));
+
+            // カメラを揺らすと、レイトレのデノイザと TAA が前のフレームを
+            // 使い回せなくなる。イベント中に重くなるならここが出どころ。
+            var shake = Camera.main != null ? Camera.main.GetComponent<Player.CameraShake>() : null;
+            if (shake == null) yield break;
+            float still = 0f, moving = 0f;
+            shake.Amount = 0f;
+            for (int i = 0; i < 20; i++) yield return null;
+            for (int i = 0; i < N; i++) { yield return null; still += Time.unscaledDeltaTime; }
+            shake.Amount = 0.8f;
+            for (int i = 0; i < 20; i++) yield return null;
+            for (int i = 0; i < N; i++) { yield return null; moving += Time.unscaledDeltaTime; }
+            shake.Amount = 0f;
+            _log.Add(string.Format(
+                "shake cost: 揺れ無し {0:F1} fps / 揺れ 0.8 {1:F1} fps  (差 {2:F2} ms/frame)",
+                N / Mathf.Max(still, 1e-4f), N / Mathf.Max(moving, 1e-4f),
+                (moving - still) / N * 1000f));
+        }
+
+        /// <summary>
+        /// イベントを 1 回起こして、各所に届いているかを実際に測る。
+        /// 「カメラを揺らし、VHS を荒らし、走りを速くし、息を替える」は
+        /// どれも別の仕組みなので、1 つでも配線が抜けていても絵は出る。
+        /// 収まったあとに基準値へ戻ることまで見る。
+        /// </summary>
+        IEnumerator PanicTest(ListenerDsp dsp)
+        {
+            var pe = FindFirstObjectByType<Player.PanicEvent>();
+            if (pe == null) { _log.Add("panic: PanicEvent が無い"); yield break; }
+            var shake = Camera.main != null ? Camera.main.GetComponent<Player.CameraShake>() : null;
+            var br = FindFirstObjectByType<Breathing>();
+            var fps = FindFirstObjectByType<FirstPersonController>();
+            var vol = FindFirstObjectByType<UnityEngine.Rendering.Volume>();
+            Post.VhsPostProcess vhs = null;
+            if (vol != null && vol.profile != null) vol.profile.TryGet(out vhs);
+
+            float sprint0 = fps != null ? fps.SprintSpeed : 0f;
+            float grain0 = vhs != null ? vhs.grain.value : 0f;
+            float track0 = vhs != null ? vhs.tracking.value : 0f;
+
+            if (dsp != null) dsp.StartRecord(20f);
+            pe.Fire();
+
+            var rows = new System.Text.StringBuilder();
+            float t0 = Time.unscaledTime, next = 0f;
+            while (Time.unscaledTime - t0 < 22f)
+            {
+                float t = Time.unscaledTime - t0;
+                if (t >= next)
+                {
+                    rows.Append(string.Format("{0:F0}s p{1:F2} 揺{2:F2} 粒{3:F2} 追{4:F2} 走{5:F1} 息{6:F2}  ",
+                        t, pe.Panic, shake != null ? shake.Amount : -1f,
+                        vhs != null ? vhs.grain.value : -1f,
+                        vhs != null ? vhs.tracking.value : -1f,
+                        fps != null ? fps.SprintSpeed : -1f,
+                        br != null ? br.Rate : -1f));
+                    next += 3f;
+                }
+                yield return null;
+            }
+            if (dsp != null)
+            {
+                try
+                {
+                    dsp.StopRecord("../artifacts/audio/panic.wav");
+                    _log.Add("panic audio        : ../artifacts/audio/panic.wav");
+                }
+                catch (System.Exception e) { _log.Add("panic audio 失敗: " + e.Message); }
+            }
+
+            _log.Add($"panic: 発生 {pe.Fired} 回 / 次の確率 {pe.Chance * 100f:F2}%");
+            _log.Add("  " + rows.ToString().TrimEnd());
+            _log.Add(string.Format(
+                "  収束後: 揺れ {0:F2} (動悸ぶん) / 走り {1:F1} (基準 {2:F1}) / "
+                + "粒 {3:F2} (基準 {4:F2}) / 追従 {5:F2} (基準 {6:F2}) / 動悸 {7:F2}",
+                shake != null ? shake.Amount : -1f,
+                fps != null ? fps.SprintSpeed : -1f, sprint0,
+                vhs != null ? vhs.grain.value : -1f, grain0,
+                vhs != null ? vhs.tracking.value : -1f, track0,
+                pe.After));
         }
 
         /// <summary>
@@ -248,7 +368,7 @@ namespace Backrooms.Capture
                 fps.ExternalSprint = t < Run;
                 if (t >= next)
                 {
-                    rows.Append($"{t:F0}s {br.Pitch:F3}  ");
+                    rows.Append($"{t:F0}s {br.Rate:F3}  ");
                     next += 4f;
                 }
                 yield return null;
@@ -260,7 +380,7 @@ namespace Backrooms.Capture
 
             _log.Add($"breath: 走り {Run:F0}s -> 休み {Rest:F0}s の再生速度");
             _log.Add("  " + rows.ToString().TrimEnd());
-            _log.Add($"  上がりきり {br.MaxPitch:F2} 倍 (走り {br.RiseSeconds:F0}s) / "
+            _log.Add($"  上がりきり {br.MaxRate:F2} 倍 (走り {br.RiseSeconds:F0}s) / "
                      + $"戻り {br.FallSeconds:F0}s / 終了時 {br.Effort:F2}");
         }
 
@@ -304,6 +424,9 @@ namespace Backrooms.Capture
             // 「チャンクの更新が見える」かどうかは、止まって測った fps では
             // 分からない。歩いている間だけを測る。
             float wWorst = 0f, wTotal = 0f;
+            // 平均だけだと、外の要因で 1 回止まっただけでも数字が別物になる。
+            // 実行のたびに 57.8-75.6 fps と振れていたので中央値も採る。
+            var wAll = new List<float>(8192);
             int wFrames = 0, hitch = 0, chMin = int.MaxValue, chMax = 0;
             int ltMax = 0, satFrames = 0;
             float agcLo = float.MaxValue, agcHi = 0f;
@@ -333,7 +456,7 @@ namespace Backrooms.Capture
                                                   new Vector3(fps.transform.position.x, 0f, fps.transform.position.z));
 
                     float fdt = Time.unscaledDeltaTime;
-                    wTotal += fdt; wFrames++;
+                    wTotal += fdt; wFrames++; wAll.Add(fdt);
                     if (fdt > wWorst) wWorst = fdt;
                     if (fdt > 0.020f) hitch++;              // 50fps を割った frame
                     if (world != null)
@@ -370,10 +493,16 @@ namespace Backrooms.Capture
                 _log.Add(string.Format("walk agc: {0:F2} 〜 {1:F2} 倍  (上限 {2:F1})",
                                        agcLo, agcHi, Mix.AgcMaxGain));
             if (wFrames > 0)
-                _log.Add($"walk frames: avg={wFrames / Mathf.Max(wTotal, 1e-4f):F1} fps  "
+            {
+                wAll.Sort();
+                float med = wAll[wAll.Count / 2];
+                float p95 = wAll[Mathf.Min(wAll.Count - 1, (int)(wAll.Count * 0.95f))];
+                _log.Add($"walk frames: 中央値 {1f / med:F1} fps ({med * 1000f:F1} ms)  "
+                         + $"95% {p95 * 1000f:F1} ms  avg={wFrames / Mathf.Max(wTotal, 1e-4f):F1} fps  "
                          + $"worst={wWorst * 1000f:F1} ms  20ms超え {hitch}/{wFrames}  "
                          + $"チャンク {(chMin == int.MaxValue ? 0 : chMin)}..{chMax}  "
                          + $"同時ライト最大 {ltMax}  上限張り付き {satFrames}/{wFrames}");
+            }
         }
 
         /// <summary>

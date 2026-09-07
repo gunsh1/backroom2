@@ -16,6 +16,12 @@ namespace Backrooms.Audio
     public class Shout : MonoBehaviour
     {
         public KeyCode Key = KeyCode.E;
+        /// <summary>
+        /// キー入力を受けるか。キャプチャ中は切る。GUI モードの Unity が
+        /// 前面を取るので、そのとき打たれた E をそのまま拾ってしまい、
+        /// 測っている最中にイベントが走って fps が別物になる。
+        /// </summary>
+        [System.NonSerialized] public bool AcceptKey = true;
 
         /// <summary>男声。SceneBuilder が Audio/Voices の male_* を入れる。</summary>
         public AudioClip[] Clips;
@@ -69,7 +75,7 @@ namespace Backrooms.Audio
             // 窓が前面に無いときの入力は見ない。エディタから再生している間、
             // 焦点の外で押された（あるいは残っていた）キーを拾って、誰も
             // 押していないのに叫ぶことがある。
-            if (!Application.isFocused) return;
+            if (!AcceptKey || !Application.isFocused) return;
             if (Input.GetKeyDown(Key) && Fire()) ByKey++;
         }
 

@@ -377,6 +377,19 @@ namespace Backrooms.EditorTools
         /// 数を増やしたければ同じ規則で並べるだけでよく、コードは触らない。
         /// (female_ は male を含むので、Contains ではなく前方一致で見ること)
         /// </summary>
+        /// <summary>
+        /// AudioImportRules を後から足したので、既存の素材は取り込み直さないと
+        /// 古い設定 (圧縮のままメモリに置く) が残り、最初に鳴らした瞬間に
+        /// 本編スレッドで復号が走る。
+        /// </summary>
+        static AudioClip LoadAudio(string path)
+        {
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            var c = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+            if (c == null) Log.Add("  音の素材が見つからない: " + path);
+            return c;
+        }
+
         static AudioClip[] LoadVoices(string prefix)
         {
             const string dir = "Assets/_Project/Audio/Voices";
@@ -790,18 +803,27 @@ namespace Backrooms.EditorTools
                 Log.Add($"呼び声: male {shout.Clips.Length} 本 ({shout.Key} キー)");
 
                 // 撮っている人の呼吸。常時。走ると上がって、ゆっくり戻る。
-                const string breathPath = "Assets/_Project/Audio/Breath_Normal.wav";
-                AssetDatabase.ImportAsset(breathPath, ImportAssetOptions.ForceUpdate);
-                var br = AssetDatabase.LoadAssetAtPath<AudioClip>(breathPath);
-                if (br != null)
+                var brN = LoadAudio("Assets/_Project/Audio/Breath_Normal.wav");
+                var brH = LoadAudio("Assets/_Project/Audio/Breath_Heavy.wav");
+                if (brN != null)
                 {
                     var breath = player.AddComponent<Breathing>();
-                    breath.Clip = br;
-                    Log.Add($"呼吸: Breath_Normal.wav ({br.length:F1}s ループ) / "
-                            + $"走り {breath.RiseSeconds:F0} 秒で速度 {breath.MaxPitch:F2} 倍 / "
-                            + $"戻り {breath.FallSeconds:F0} 秒");
+                    breath.Normal = brN;
+                    breath.Heavy = brH;
+                    Log.Add($"呼吸: 平常 {brN.length:F1}s / 異常時 "
+                            + (brH != null ? $"{brH.length:F1}s" : "無し")
+                            + $" / 走り {breath.RiseSeconds:F0} 秒で速度 {breath.MaxRate:F2} 倍 "
+                            + $"(音程は変えない) / 戻り {breath.FallSeconds:F0} 秒");
                 }
                 else Log.Add("呼吸: Breath_Normal.wav が無い");
+
+                // 呼びかけへの「返事」。低い確率で、起きるたび半減。
+                var panic = player.AddComponent<PanicEvent>();
+                panic.Sting = LoadAudio("Assets/_Project/Audio/Sting_Horror.wav");
+                Log.Add($"イベント: 確率 {panic.FirstChance * 100f:F1}% "
+                        + $"(起きるたび x{panic.ChanceDecay:F2}) / 収束 {panic.Settle:F0} 秒 / "
+                        + $"動悸 {panic.AfterSeconds:F0} 秒 / "
+                        + (panic.Sting != null ? $"Sting {panic.Sting.length:F1}s" : "Sting 無し"));
             }
 
             var camGo = new GameObject("MainCamera");
@@ -832,6 +854,9 @@ namespace Backrooms.EditorTools
             // 描画先が何であれ 4:3 で描く。ウィンドウ比率のままだと
             // VHS 側で 4:3 の窓に詰め直したときに縦長に潰れる。
             camGo.AddComponent<FixedAspect>().Aspect = _aspect;
+            // 持っている人が動揺したぶんの揺れ。歩行の揺れ (Head) とは別で、
+            // Head の子であるカメラの局所変換を触るので足し合わさる。
+            camGo.AddComponent<CameraShake>();
             var camData = camGo.AddComponent<HDAdditionalCameraData>();
 
             try

@@ -53,6 +53,7 @@ namespace Backrooms.Audio
         public float NextIn { get { return Mathf.Max(0f, _next - Time.unscaledTime); } }
 
         AudioSource _direct, _wet;
+        ReverbSend _send;
         AudioLowPassFilter _lp;
         Transform _ear;
         float _next;
@@ -79,9 +80,9 @@ namespace Backrooms.Audio
             _wet.spatialBlend = 0f;
             _wet.volume = 1f;
             _wet.dopplerLevel = 0f;
-            var rs = w.AddComponent<ReverbSend>();
-            rs.Target = listener;
-            rs.Gain = Send;
+            _send = w.AddComponent<ReverbSend>();
+            _send.Target = listener;
+            _send.Gain = Send;
 
             _next = Time.unscaledTime + FirstDelay;
         }
@@ -98,8 +99,11 @@ namespace Backrooms.Audio
             Fire();
         }
 
-        /// <summary>次の 1 回を今すぐ鳴らす。キャプチャからも叩ける。</summary>
-        public bool Fire()
+        /// <summary>
+        /// 次の 1 回を今すぐ鳴らす。キャプチャとイベントからも叩ける。
+        /// gain はイベント時に前に出すための倍率。
+        /// </summary>
+        public bool Fire(float gain = 1f)
         {
             Schedule();
             if (Clips == null || Clips.Length == 0 || _direct == null || _ear == null) return false;
@@ -128,13 +132,14 @@ namespace Backrooms.Audio
             // こうしておくと定位だけが残り、鳴っている間に近づけば大きくなる。
             _direct.minDistance = dist;
             _direct.clip = clip;
-            _direct.volume = DirectVolume * (blocked ? 0.25f : 1f);
+            _direct.volume = DirectVolume * (blocked ? 0.25f : 1f) * gain;
             _lp.cutoffFrequency = blocked ? OccludedCutoff : OpenCutoff;
 
             double at = AudioSettings.dspTime + 0.03;
             _direct.PlayScheduled(at);
             _wet.clip = clip;
             _wet.PlayScheduled(at);
+            if (_send != null) _send.Gain = Send * gain;
 
             LastAt = p; LastDistance = dist; LastOccluded = blocked;
             Played++;

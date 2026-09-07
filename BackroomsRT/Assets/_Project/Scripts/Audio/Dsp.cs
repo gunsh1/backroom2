@@ -330,6 +330,70 @@ namespace Backrooms.Audio
     /// 最後のものが一番効く。無音のはずの廊下で「サー」が膨らんでくるのは、
     /// マイクが自分でそうしているから。
     /// </summary>
+    /// <summary>
+    /// 音程を変えずに再生速度だけ変える (時間伸縮)。
+    ///
+    /// AudioSource.pitch は再生速度と音程を同時に動かす。息が上がって
+    /// 周期が速くなるのは正しいが、声帯と気道の共鳴まで一緒に上がって
+    /// 別人の息になってしまう。実際に息が上がっても共鳴の高さは変わらない。
+    ///
+    /// 速さだけ動かすには、短い粒に切って重ねながら出す (overlap-add)。
+    /// 粒の中は元の速さのまま読むので音程は動かず、次の粒をどこから
+    /// 取り出すかの進み方だけが速さになる。窓は Hann、重なりは 50%。
+    /// この組み合わせは窓の和が定数になるので、速度 1.0 なら元の波形が
+    /// そのまま戻る。息のような広帯域の音は粒の継ぎ目の位相ずれが
+    /// 聞こえないので、位相を合わせ直す手の込んだ処理は要らない。
+    /// </summary>
+    public sealed class Ola
+    {
+        readonly int _g, _hop;
+        readonly float[] _win, _acc;
+        float[] _src;
+        double _pos;
+        int _out;
+
+        /// <summary>粒の長さ (サンプル)。64ms 前後。短いと息の質感が崩れる。</summary>
+        public Ola(int grain = 3072)
+        {
+            _g = grain; _hop = grain / 2;
+            _win = new float[_g];
+            for (int i = 0; i < _g; i++)
+                _win[i] = 0.5f * (1f - (float)Math.Cos(2.0 * Math.PI * i / _g));
+            _acc = new float[_g];
+            _out = _hop;                 // 最初の呼び出しで粒を 1 つ入れる
+        }
+
+        /// <summary>音源。出力と同じ標本化周波数に直してから渡すこと。</summary>
+        public void SetSource(float[] src) { _src = src; }
+
+        public bool Ready { get { return _src != null && _src.Length > _g + 2; } }
+
+        /// <summary>rate = 1 で等速、1.2 で 1.2 倍速 (音程は変わらない)。</summary>
+        public float Next(float rate)
+        {
+            if (!Ready) return 0f;
+            if (_out >= _hop)
+            {
+                Array.Copy(_acc, _hop, _acc, 0, _hop);
+                Array.Clear(_acc, _hop, _hop);
+                int n = _src.Length;
+                for (int i = 0; i < _g; i++)
+                {
+                    double sp = _pos + i;
+                    int i0 = (int)sp;
+                    float f = (float)(sp - i0);
+                    float a = _src[i0 % n], b = _src[(i0 + 1) % n];
+                    _acc[i] += (a + (b - a) * f) * _win[i];
+                }
+                _pos += _hop * rate;
+                while (_pos >= n) _pos -= n;
+                while (_pos < 0) _pos += n;
+                _out = 0;
+            }
+            return _acc[_out++];
+        }
+    }
+
     public sealed class Tape
     {
         readonly Biquad _hpL = new Biquad(), _hpR = new Biquad();

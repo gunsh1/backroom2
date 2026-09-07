@@ -331,7 +331,10 @@ namespace Backrooms.EditorTools
             int len = Fs * 30;
             var dry = new float[len];
 
-            double idx = 0;
+            // 実行時と同じ Ola で描く。ここを単純な読み飛ばしにすると
+            // 音程ごと上がるので、「速さだけ変えた」ことを測って確かめられない。
+            var ola = new Ola();
+            ola.SetSource(data);
             float pkPitch = 1f, endPitch = 1f;
             for (int i = 0; i < len; i++)
             {
@@ -342,13 +345,18 @@ namespace Backrooms.EditorTools
                 float pitch = Mathf.Lerp(1f, MaxPitch, effort);
                 if (pitch > pkPitch) pkPitch = pitch;
                 endPitch = pitch;
+                dry[i] = ola.Next(pitch) * Mix.Breath * Mathf.Lerp(1f, Loud, effort);
+            }
 
-                int i0 = (int)idx;
-                float f = (float)(idx - i0);
-                float a = data[i0 % data.Length], b = data[(i0 + 1) % data.Length];
-                dry[i] = (a * (1f - f) + b * f) * Mix.Breath * Mathf.Lerp(1f, Loud, effort);
-                idx += pitch;
-                if (idx >= data.Length) idx -= data.Length;
+            // 速度を固定した 2 本。音程が動いていないことと、素材の
+            // どこを読んでいるかが 1.2 倍で進んでいることを測る用。
+            foreach (var r in new[] { 1.00f, 1.20f })
+            {
+                var o2 = new Ola();
+                o2.SetSource(data);
+                var fix = new float[Fs * 20];
+                for (int i = 0; i < fix.Length; i++) fix[i] = o2.Next(r);
+                Wav.Write(Path.Combine(dir, $"breath_rate{(int)(r * 100)}.wav"), fix, 1, Fs);
             }
             // 床を混ぜる前の呼吸だけも出しておく。混ぜたあとでは、息が
             // 上がったときに音量が 1.8 倍になる分へ重心が引きずられて、
