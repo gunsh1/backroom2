@@ -106,13 +106,19 @@ namespace Backrooms.Player
             System.Array.Sort(_order, (a, b) => _dist[a].CompareTo(_dist[b]));
 
             float r2 = Radius * Radius;
+            int onCount = 0;
             for (int k = 0; k < _order.Length; k++)
             {
                 var l = _lights[_order[k]];
                 if (l == null) continue;
                 bool on = k < MaxActive && _dist[_order[k]] <= r2;
+                if (on) onCount++;
                 if (l.enabled != on) l.enabled = on;
             }
+            ActiveCount = onCount;
+            // 半径の中に上限より多くの器具があると、近い順に選び直すたびに
+            // 点く器具が入れ替わって明かりが泳ぐ。起きていたら記録に残す。
+            Saturated = onCount >= MaxActive;
         }
 
         public void RefreshNow()
@@ -126,5 +132,11 @@ namespace Backrooms.Player
         }
 
         public int Count => _lights == null ? 0 : _lights.Length;
+
+        /// <summary>実際に点いている数。</summary>
+        public int ActiveCount { get; private set; }
+
+        /// <summary>上限に張り付いているか。真なら歩くたびに器具が入れ替わる。</summary>
+        public bool Saturated { get; private set; }
     }
 }

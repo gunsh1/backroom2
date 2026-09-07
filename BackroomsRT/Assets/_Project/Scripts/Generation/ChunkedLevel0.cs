@@ -53,6 +53,7 @@ namespace Backrooms.Generation
 
         class Chunk
         {
+            public int Cx, Cz;
             public GameObject Root;
             public List<Light> Lights = new List<Light>();
             public Material FlickerMat;
@@ -68,6 +69,17 @@ namespace Backrooms.Generation
         int _lastCx = int.MinValue, _lastCz = int.MinValue;
 
         static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
+
+        /// <summary>
+        /// チャンク格子上の距離。円ではなく正方形で測る。
+        ///
+        /// 円にすると斜め方向だけが早く途切れる。半径 4 の円なら (3,3) は
+        /// 外なので、自分のチャンクの角に立ったとき未生成の角が 41m 先に
+        /// 来てしまう。破棄はさらに近く 61m。遠クリップが 80m なので
+        /// どちらも見える。しかも斜めにだけ起きるので「四角い継ぎ目」に見える。
+        /// 正方形なら向きによらず (半径-1) x 14.4m を必ず確保できる。
+        /// </summary>
+        static int Cheb(int dx, int dz) => Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dz));
 
         void Awake()
         {
@@ -85,7 +97,7 @@ namespace Backrooms.Generation
             int wr = Mathf.Max(1, Mathf.Min(WarmRadius, LoadRadius));
             for (int dx = -wr; dx <= wr; dx++)
                 for (int dz = -wr; dz <= wr; dz++)
-                    if (dx * dx + dz * dz <= wr * wr) Ensure(c.x + dx, c.y + dz);
+                    Ensure(c.x + dx, c.y + dz);
             if (_culler != null) _culler.Rebuild();
             StartCoroutine(Stream());
         }
@@ -108,15 +120,16 @@ namespace Backrooms.Generation
 
                 // 近い順に。1 フレームあたりの数だけ作ったら必ず返す。
                 bool made = false;
-                for (int n = 0; n < Mathf.Max(1, ChunksPerFrame); n++)
+                int budget = Mathf.Max(1, ChunksPerFrame);
+                for (int n = 0; n < budget; n++)
                 {
                     Vector2Int? next = null;
                     int best = int.MaxValue;
                     for (int dx = -LoadRadius; dx <= LoadRadius; dx++)
                         for (int dz = -LoadRadius; dz <= LoadRadius; dz++)
                         {
-                            int d = dx * dx + dz * dz;
-                            if (d > LoadRadius * LoadRadius || d >= best) continue;
+                            int d = dx * dx + dz * dz;              // 順序だけは近い順
+                            if (d >= best) continue;
                             var k = new Vector2Int(c.x + dx, c.y + dz);
                             if (_live.ContainsKey(Key(k.x, k.y))) continue;
                             best = d; next = k;
@@ -125,7 +138,33 @@ namespace Backrooms.Generation
                     Ensure(next.Value.x, next.Value.y);
                     made = true;
                 }
-                if (made && _culler != null) _culler.Rebuild();
+
+                // ライトの付け外し。作るのと同じ予算で、近い順に 1 つずつ直す。
+                for (int n = 0; n < budget; n++)
+                {
+                    Chunk fix = null;
+                    int best = int.MaxValue;
+                    foreach (var kv in _live)
+                    {
+                        var ch = kv.Value;
+                        bool want = Cheb(ch.Cx - c.x, ch.Cz - c.y) <= LightRadius;
+                        if (ch.HasLights == want) continue;
+                        int d = (ch.Cx - c.x) * (ch.Cx - c.x) + (ch.Cz - c.y) * (ch.Cz - c.y);
+                        if (d >= best) continue;
+                        best = d; fix = ch;
+                    }
+                    if (fix == null) break;
+                    SetChunkLights(fix, !fix.HasLights);
+                    made = true;
+                }
+
+                if (made && _culler != null)
+                {
+                    _culler.Rebuild();
+                    int n2 = 0;
+                    foreach (var kv in _live) n2 += kv.Value.Lights.Count;
+                    LiveLights = n2;
+                }
                 yield return wait;
             }
         }
@@ -136,8 +175,7 @@ namespace Backrooms.Generation
             foreach (var kv in _live)
             {
                 int x = (int)(kv.Key >> 32), z = (int)(uint)kv.Key;
-                int dx = x - c.x, dz = z - c.y;
-                if (dx * dx + dz * dz > (LoadRadius + 1) * (LoadRadius + 1))
+                if (Cheb(x - c.x, z - c.y) > LoadRadius + 1)
                     _wanted.Add(new Vector2Int(x, z));
             }
             foreach (var k in _wanted)
@@ -155,8 +193,7 @@ namespace Backrooms.Generation
             long k = Key(cx, cz);
             if (_live.ContainsKey(k)) return;
             var c = ChunkOf(Viewer != null ? Viewer.position : Vector3.zero);
-            int dx = cx - c.x, dz = cz - c.y;
-            bool lights = dx * dx + dz * dz <= LightRadius * LightRadius;
+            bool lights = Cheb(cx - c.x, cz - c.y) <= LightRadius;
             _live[k] = Build(cx, cz, lights);
         }
 
@@ -185,7 +222,8 @@ namespace Backrooms.Generation
             const float TW = Level0Builder.TBarW, RV = Level0Builder.TileReveal;
             int S = Seed;
 
-            var ch = new Chunk { HasLights = withLights, Phase = Level0Layout.Hash(cx, cz, 7) % 1000 / 1000f };
+            var ch = new Chunk { Cx = cx, Cz = cz, HasLights = false,
+                                 Phase = Level0Layout.Hash(cx, cz, 7) % 1000 / 1000f };
             ch.Root = new GameObject($"Chunk_{cx}_{cz}");
             ch.Root.transform.SetParent(transform, false);
             var T = ch.Root.transform;
@@ -229,13 +267,6 @@ namespace Backrooms.Generation
                     var st = Level0Layout.LampAt(i, j, S);
                     EmitTroffer(fixMesh, st == Level0Layout.Lamp.Lit ? lensOn
                                        : st == Level0Layout.Lamp.Flicker ? lensFlk : lensOff, ci, cj, H);
-                    if (withLights && st != Level0Layout.Lamp.Dead)
-                    {
-                        var l = MakeLight(T, Level0Layout.FixtureCenter(i, j), i, j);
-                        ch.Lights.Add(l);
-                        if (st == Level0Layout.Lamp.Flicker)
-                            ch.FlickerLights.Add(l.GetComponent<HDAdditionalLightData>());
-                    }
                 }
 
             for (int ci = a0; ci < a1; ci++)
@@ -293,10 +324,44 @@ namespace Backrooms.Generation
                 ch.FlickerMat = new Material(Materials.DiffuserOn);
                 Spawn(T, "DiffusersFlicker", lensFlk, ch.FlickerMat, false, false);
             }
-            LiveLights = 0;
-            foreach (var kv in _live) LiveLights += kv.Value.Lights.Count;
-            LiveLights += ch.Lights.Count;
+            if (withLights) SetChunkLights(ch, true);
             return ch;
+        }
+
+        /// <summary>
+        /// チャンクのエリアライトを付ける／外す。
+        ///
+        /// 以前は作る瞬間の視点からの距離で決め打ちしていた。歩いて近づいても
+        /// 後から足されないので、開始時に遠かったチャンクは、その中に立っても
+        /// 直接光が 1 台も無いままだった。自発光だけは残るので気付きにくいが、
+        /// 床と壁への当たり方がチャンクごとに変わる。視点が動いたら直す。
+        /// </summary>
+        void SetChunkLights(Chunk ch, bool want)
+        {
+            if (ch.HasLights == want || ch.Root == null) return;
+            ch.HasLights = want;
+            if (!want)
+            {
+                for (int i = 0; i < ch.Lights.Count; i++)
+                    if (ch.Lights[i] != null) Destroy(ch.Lights[i].gameObject);
+                ch.Lights.Clear();
+                ch.FlickerLights.Clear();
+                return;
+            }
+            int S = Seed;
+            int i0 = ch.Cx * BaysPerChunk, i1 = i0 + BaysPerChunk;
+            int j0 = ch.Cz * BaysPerChunk, j1 = j0 + BaysPerChunk;
+            for (int i = i0; i < i1; i++)
+                for (int j = j0; j < j1; j++)
+                {
+                    if (!Level0Layout.HasFixture(i, j, S) || !Level0Layout.FixtureFree(i, j, S)) continue;
+                    var st = Level0Layout.LampAt(i, j, S);
+                    if (st == Level0Layout.Lamp.Dead) continue;
+                    var l = MakeLight(ch.Root.transform, Level0Layout.FixtureCenter(i, j), i, j);
+                    ch.Lights.Add(l);
+                    if (st == Level0Layout.Lamp.Flicker)
+                        ch.FlickerLights.Add(l.GetComponent<HDAdditionalLightData>());
+                }
         }
 
         Light MakeLight(Transform parent, Vector3 p, int i, int j)

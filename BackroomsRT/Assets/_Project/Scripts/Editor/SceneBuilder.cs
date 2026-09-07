@@ -113,7 +113,11 @@ namespace Backrooms.EditorTools
             _eyeH = Level0Replica.EyeH;
             _areaSize = new Vector2(0.556f, 0.556f);
             _lumens = 700f;
-            _maxActiveLights = 300; _lightRadius = 42f; _lookAhead = 12f;
+            // 半径 42m の中には点灯器具が約 925 台ある。上限 300 だと近い
+            // 300 台だけが点き、0.75m 動くたびに入れ替わって明かりが泳ぐ。
+            // 半径を「上限で全部点けきれる大きさ」まで落とすと、実効的な
+            // 明るさは変わらないまま入れ替わりが消える。
+            _maxActiveLights = 450; _lightRadius = 28f; _lookAhead = 12f;
             _expComp = 1.98f - 0.40f;
             // 記録系は VHS ポストが持つので、書き出し側の媒体は掛けない
             _lensK1 = 0f; _blurSigma = 0f; _glare = 0f; _glareSigma = 0f;
@@ -184,10 +188,12 @@ namespace Backrooms.EditorTools
             var world = root.AddComponent<ChunkedLevel0>();
             world.Materials = mats;
             world.Seed = 1996;
-            world.LoadRadius = 4;      // 57.6m
+            world.LoadRadius = 4;      // 正方形なので向きによらず 57.6m
             world.WarmRadius = 4;      // 歩き出す前に全部作っておく
             world.ChunksPerFrame = 2;
-            world.LightRadius = 2;
+            // 間引きの半径 28m + 先読み 12m = 40m まではライトが要る。
+            // 3 チャンク (43.2m) あれば向きによらず足りる。
+            world.LightRadius = 3;
             world.Lumens = _lumens;
             world.AreaSize = _areaSize;
             world.DiffuserNits = 700f;

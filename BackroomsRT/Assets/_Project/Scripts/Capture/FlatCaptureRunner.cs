@@ -95,13 +95,20 @@ namespace Backrooms.Capture
             _log.Add("lightmaps          : " + LightmapSettings.lightmaps.Length);
             _log.Add("shots              : " + shots.Length
                      + (route != null ? " (from CaptureRoute)" : " (fallback)"));
+            for (int i = 0; i < WarmupFrames; i++) yield return null;
+
+            // 数えるのは暖機のあと。ChunkedLevel0.Start より先にここへ来るので、
+            // 前に置くと必ず 0 が記録される。
             if (world != null)
                 _log.Add("chunks             : " + world.LoadedChunks
                          + "  (" + ChunkedLevel0.ChunkSize.ToString("F1") + " m each)");
-            _log.Add("area lights        : " + (culler != null ? culler.Count.ToString() : "no culler")
-                     + (culler != null ? "  max active " + culler.MaxActive : ""));
-
-            for (int i = 0; i < WarmupFrames; i++) yield return null;
+            if (culler != null)
+            {
+                culler.RefreshNow();
+                _log.Add("area lights        : " + culler.Count + " 個  うち点灯 "
+                         + culler.ActiveCount + "  上限 " + culler.MaxActive
+                         + (culler.Saturated ? "  << 上限に張り付き (歩くと入れ替わる)" : ""));
+            }
 
             // 出力用 RT はキャプチャ中ずっとカメラの描画先にしておく。
             // 待機後に cam.Render() を一発呼ぶ方式だと TAA とレイトレのデノイザに
@@ -170,7 +177,7 @@ namespace Backrooms.Capture
             _log.Add($"fps: avg={avg:F1}  worst frame={worst * 1000f:F1} ms  ({FpsFrames} frames)"
                      + $"   [{Width}x{Height}]");
 
-            yield return WalkTest(fps, route, culler);
+            yield return WalkTest(fps, route, culler, world);
             Finish();
         }
 
@@ -179,7 +186,8 @@ namespace Backrooms.Capture
         /// ベイのグラフ上の連結を確認しただけでは歩けることの証明にならない。
         /// コライダ・開口の有効幅・敷居の段差のどれかが引っ掛かれば止まる。
         /// </summary>
-        IEnumerator WalkTest(FirstPersonController fps, CaptureRoute route, LightCuller culler)
+        IEnumerator WalkTest(FirstPersonController fps, CaptureRoute route, LightCuller culler,
+                             ChunkedLevel0 world)
         {
             if (route == null || route.Waypoints == null || route.Waypoints.Length < 2)
             {
@@ -196,6 +204,11 @@ namespace Backrooms.Capture
             int reached = 0;
             float t0 = Time.unscaledTime, stuckAt = -1f;
             float travelled = 0f;
+            // 「チャンクの更新が見える」かどうかは、止まって測った fps では
+            // 分からない。歩いている間だけを測る。
+            float wWorst = 0f, wTotal = 0f;
+            int wFrames = 0, hitch = 0, chMin = int.MaxValue, chMax = 0;
+            int ltMax = 0, satFrames = 0;
 
             for (int k = 1; k < wp.Length; k++)
             {
@@ -220,6 +233,21 @@ namespace Backrooms.Capture
                     yield return null;
                     travelled += Vector3.Distance(new Vector3(p.x, 0f, p.z),
                                                   new Vector3(fps.transform.position.x, 0f, fps.transform.position.z));
+
+                    float fdt = Time.unscaledDeltaTime;
+                    wTotal += fdt; wFrames++;
+                    if (fdt > wWorst) wWorst = fdt;
+                    if (fdt > 0.020f) hitch++;              // 50fps を割った frame
+                    if (world != null)
+                    {
+                        chMin = Mathf.Min(chMin, world.LoadedChunks);
+                        chMax = Mathf.Max(chMax, world.LoadedChunks);
+                    }
+                    if (culler != null)
+                    {
+                        ltMax = Mathf.Max(ltMax, culler.ActiveCount);
+                        if (culler.Saturated) satFrames++;
+                    }
                 }
                 fps.ExternalMove = new Vector2(0f, 1f);
                 var d = wp[k] - fps.transform.position; d.y = 0f;
@@ -234,6 +262,11 @@ namespace Backrooms.Capture
             _log.Add($"walk: reached {reached}/{wp.Length - 1} waypoints in {dt:F1} s, "
                      + $"travelled {travelled:F1} m"
                      + (stuckAt >= 0 ? $"  STUCK before waypoint {stuckAt} at {fps.transform.position}" : "  OK"));
+            if (wFrames > 0)
+                _log.Add($"walk frames: avg={wFrames / Mathf.Max(wTotal, 1e-4f):F1} fps  "
+                         + $"worst={wWorst * 1000f:F1} ms  20ms超え {hitch}/{wFrames}  "
+                         + $"チャンク {(chMin == int.MaxValue ? 0 : chMin)}..{chMax}  "
+                         + $"同時ライト最大 {ltMax}  上限張り付き {satFrames}/{wFrames}");
         }
 
         /// <summary>
