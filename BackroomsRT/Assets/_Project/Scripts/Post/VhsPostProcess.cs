@@ -111,6 +111,11 @@ namespace Backrooms.Post
             _mat.SetFloat(ID.Grain, grain.value);
             _mat.SetFloat(ID.Fisheye, fisheye.value * intensity.value);
             _mat.SetFloat(ID.Pillar, pillarbox.value ? 1f : 0f);
+            // 差し込む実写。値は ColdOpen が Game.IntroFeed に置く。
+            var plate = Game.IntroFeed.Tex;
+            _mat.SetFloat(ID.Intro, plate != null ? Mathf.Clamp01(Game.IntroFeed.Amount) : 0f);
+            _mat.SetTexture(ID.IntroTex, plate != null ? plate : Texture2D.blackTexture);
+            _mat.SetVector(ID.IntroFit, Game.IntroFeed.Fit);
             // ビューファインダ。値は TapeState が Game.Osd に置く。
             _mat.SetFloat(ID.Osd, Game.Osd.Enabled ? 1f : 0f);
             _mat.SetVector(ID.OsdTime, new Vector4(Game.Osd.Hours, Game.Osd.Minutes,
@@ -142,6 +147,9 @@ namespace Backrooms.Post
             public static readonly int Grain = Shader.PropertyToID("_Grain");
             public static readonly int Fisheye = Shader.PropertyToID("_Fisheye");
             public static readonly int Pillar = Shader.PropertyToID("_Pillar");
+            public static readonly int Intro = Shader.PropertyToID("_Intro");
+            public static readonly int IntroTex = Shader.PropertyToID("_IntroTex");
+            public static readonly int IntroFit = Shader.PropertyToID("_IntroFit");
             public static readonly int Osd = Shader.PropertyToID("_Osd");
             public static readonly int OsdTime = Shader.PropertyToID("_OsdTime");
             public static readonly int OsdTape = Shader.PropertyToID("_OsdTape01");

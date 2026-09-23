@@ -35,6 +35,9 @@ Shader "Hidden/Backrooms/Vhs"
 
     TEXTURE2D_X(_MainTex);
 
+    // 差し込む実写。シーンと「差し替える」もので、重ねるものではない。
+    TEXTURE2D(_IntroTex);
+
     float  _Intensity;
     float  _Lines;          // 縦の走査線数 (NTSC の有効走査線 486 本)
     float  _LumaBand;       // 輝度の水平帯域 (画面幅あたりの標本数)
@@ -51,6 +54,10 @@ Shader "Hidden/Backrooms/Vhs"
     float  _Tint;           // 蛍光灯の緑かぶり (補正されない水銀の輝線)
     float  _Fisheye;        // 広角レンズの樽型歪み
     float  _Pillar;         // 4:3 に切り詰めるか
+
+    // 差し込む実写。0 で素通し、1 で全面が実写になる。
+    float  _Intro;
+    float4 _IntroFit;       // 4:3 の窓への収め方。uv' = (uv - zw) / xy
 
     // ビューファインダの表示。テープに焼かれる前の、記録時に合成される信号。
     float  _Osd;            // 0 で出さない (参照画像の撮影時)
@@ -136,7 +143,22 @@ Shader "Hidden/Backrooms/Vhs"
         uv = clamp(uv, 0.0, 1.0);
         float3 c = SAMPLE_TEXTURE2D_X_LOD(_MainTex, s_linear_clamp_sampler,
                        ClampAndScaleUVForBilinearPostProcessTexture(uv), 0).xyz;
-        return clamp(c, 0.0, 4.0);
+        c = clamp(c, 0.0, 4.0);
+
+        // 実写はここで差し替える。以降のテープの処理 (帯域制限・ずれ・
+        // ドロップアウト・グレイン・タイムコード) を全部同じように通るので、
+        // 1 本のテープが続いているように見える。別経路で重ねると、
+        // 切り替わった瞬間に「ここから作り物」だと分かってしまう。
+        if (_Intro > 0.0)
+        {
+            float2 vu = (uv - _IntroFit.zw) / max(_IntroFit.xy, 1e-4);
+            float inside = step(0.0, vu.x) * step(vu.x, 1.0)
+                         * step(0.0, vu.y) * step(vu.y, 1.0);
+            float3 v = SAMPLE_TEXTURE2D_LOD(_IntroTex, s_linear_clamp_sampler,
+                                            saturate(vu), 0).xyz * inside;
+            c = lerp(c, v, saturate(_Intro));
+        }
+        return c;
     }
 
     // RGB <-> YIQ。VHS は輝度と色差を別々の帯域で記録するので、

@@ -544,6 +544,15 @@ namespace Backrooms.EditorTools
             exitGo.transform.position = geo.Spawn;
             var exit = exitGo.AddComponent<Backrooms.Game.Exit>();
 
+            // 最初の最初。実写から落ちてくる。1 本目だけ。
+            var cold = root.AddComponent<Backrooms.Game.ColdOpen>();
+            cold.Impact = LoadAudio("Assets/_Project/Audio/Impact_Fall.wav");
+            var clip = "Assets/StreamingAssets/" + cold.ClipFile;
+            Log.Add($"導入: 実写 {cold.ClipFile} "
+                    + (System.IO.File.Exists(clip) ? "あり" : "**無し (真っ暗で始まる)**")
+                    + $" を {cold.PlateSeconds:F0} 秒 -> {cold.FallSeconds:F2} 秒で落下 "
+                    + $"(目線 {cold.FallHeight:F2}m -> {cold.LandEye:F2}m) -> キーで起床");
+
             var threatGo = new GameObject("Threat");
             var threat = threatGo.AddComponent<Backrooms.Game.Threat>();
             // 仮の声。安定器のうなりを落としたものを M-B で作るまでの間に合わせ。

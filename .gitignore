@@ -50,6 +50,7 @@ sysinfo.txt
 # ==========================================================
 artifacts/dl/
 artifacts/previews/
+artifacts/intro/
 artifacts/*.log
 artifacts/*.json
 artifacts/sheet_*.png

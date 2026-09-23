@@ -37,7 +37,13 @@ namespace Backrooms.Game
             Line($"  {(ok ? "OK  " : "NG  ")}{what}  -> {got}");
         }
 
-        void Awake() { SaveData.Wipe(); }
+        void Awake()
+        {
+            SaveData.Wipe();
+            // 導入を短くする。Start では遅い (ColdOpen が先に読んでしまう)。
+            var cold = FindFirstObjectByType<ColdOpen>();
+            if (cold != null) { cold.PlateSeconds = 2.0f; cold.PromptAfter = 0.6f; }
+        }
 
         IEnumerator Start()
         {
@@ -56,6 +62,7 @@ namespace Backrooms.Game
             var threat = FindFirstObjectByType<Threat>();
             var torch = FindFirstObjectByType<Flashlight>();
 
+            _vhsTape = VhsTape();
             Line("=== ゲームの自己検査 " + System.DateTime.Now + " ===");
             Line("");
             Line("組み立て");
@@ -66,6 +73,73 @@ namespace Backrooms.Game
                   threat != null ? $"追跡 {threat.HuntSpeed:F2} m/s" : "無し");
             Check("Hud", FindFirstObjectByType<Hud>() != null, "あり");
             Check("テープ 1 本目から", s.Save.tapeNumber == 1, $"{s.Save.tapeNumber} 本目");
+
+            // --- 最初の最初
+            Line("");
+            Line("導入 (実写 -> 落下 -> 倒れる)");
+            var cold = FindFirstObjectByType<ColdOpen>();
+            if (cold != null)
+            {
+                Check("落ちるところから始まる", s.Current == Phase.Intro, s.Current.ToString());
+
+                float w = 0f;
+                while (w < 9f && IntroFeed.Amount < 0.9f) { w += Time.deltaTime; yield return null; }
+                Check("実写が読めた", cold.HasClip, cold.HasClip ? "あり" : "無し (真っ暗)");
+                Check("実写に差し替わる", IntroFeed.Amount > 0.9f, $"{IntroFeed.Amount:F2}");
+                // 配線だけ通って真っ黒、を見逃さない。
+                float luma = cold.PlateLuma();
+                Check("実写が真っ黒ではない", luma > 0.02f, $"輝度 {luma:F3}");
+                yield return Snap("I0_plate");
+
+                // 落下
+                w = 0f;
+                while (w < 6f && cold.Step != OpenStep.Down) { w += Time.deltaTime; yield return null; }
+                Check("落ちて倒れる", cold.Step == OpenStep.Down, cold.Step.ToString());
+                Check("実写は消えている", IntroFeed.Amount < 0.01f, $"{IntroFeed.Amount:F2}");
+
+                var head = fps != null ? fps.Head : null;
+                float eye = head != null ? head.position.y : -1f;
+                Check("目線が床の近くまで落ちる", eye > 0f && eye < 0.6f, $"{eye:F2} m");
+                float roll = head != null ? Mathf.Abs(Mathf.DeltaAngle(0f, head.localEulerAngles.z)) : 0f;
+                Check("横倒しになる", roll > 50f, $"{roll:F0} 度");
+
+                // 自動では立たない。最初の入力が自分の意思であること。
+                yield return new WaitForSeconds(1.6f);
+                Check("押すまで立たない",
+                      s.Current == Phase.Intro && cold.Step == OpenStep.Down,
+                      $"{s.Current} / {cold.Step}");
+                var hud = FindFirstObjectByType<Hud>();
+                Check("押し方が出る", hud != null && hud.NoteShown && !string.IsNullOrEmpty(hud.Note),
+                      hud == null ? "Hud 無し"
+                                  : $"{(hud.NoteShown ? "表示" : "非表示")} \"{hud.Note}\"");
+                // 落ちている間に暗幕が出ると画が全部隠れる。
+                Check("暗幕は出さない", hud != null && !hud.ScrimShown,
+                      hud != null && hud.ScrimShown ? "出ている" : "出ていない");
+                yield return Snap("I1_down");
+
+                cold.Stand();
+                w = 0f;
+                while (w < 5f && s.Current == Phase.Intro) { w += Time.deltaTime; yield return null; }
+                Check("押すと立って操作が渡る", s.Current == Phase.Playing, s.Current.ToString());
+                eye = head != null ? head.position.y : -1f;
+                // 立った目線は 1.68m ではない。このシーンは参照フッテージに
+                // 合わせてカメラを胸の高さで構えるので、EyeOffset で下げてある。
+                // 決め打ちではなく本人の値と突き合わせる。
+                float standEye = fps != null ? fps.StandHeight + fps.EyeOffset : -1f;
+                Check("目線が立った高さに戻る", Mathf.Abs(eye - standEye) < 0.05f,
+                      $"{eye:F2} m (立った高さ {standEye:F2} m)");
+                Check("操作が効く", fps != null && fps.enabled, fps != null && fps.enabled ? "有効" : "無効");
+                Check("案内が消える", hud != null && !hud.NoteShown,
+                      hud != null && hud.NoteShown ? "残っている" : "消えた");
+                Check("テープの荒れが戻る", Mathf.Abs(_vhsTape - VhsTape()) < 0.01f,
+                      $"tape {VhsTape():F2} (基準 {_vhsTape:F2})");
+                // 20 回以上死ぬ設計なので、毎回これを見せられると邪魔にしかならない。
+                // GameSession が実際に使う判定をそのまま突く。
+                Check("1 本目だけ流す",
+                      cold.WouldPlay(1) && !cold.WouldPlay(2) && !cold.WouldPlay(9),
+                      $"1本目 {cold.WouldPlay(1)} / 2本目 {cold.WouldPlay(2)} / 9本目 {cold.WouldPlay(9)}");
+            }
+            else Check("ColdOpen", false, "無し");
 
             // --- 時計が減る
             Line("");
@@ -270,6 +344,50 @@ namespace Backrooms.Game
             Line($"  場所: {SaveData.Where}");
 
             Finish();
+        }
+
+        float _vhsTape = -1f;
+
+        /// <summary>VHS の荒れ具合を 1 つだけ読む。導入が値を持ち逃げしないかの確認用。</summary>
+        static float VhsTape()
+        {
+            var vol = FindFirstObjectByType<UnityEngine.Rendering.Volume>();
+            Backrooms.Post.VhsPostProcess v;
+            if (vol == null || vol.profile == null || !vol.profile.TryGet(out v)) return -1f;
+            return v.tape.value;
+        }
+
+        /// <summary>導入の見た目を 1 枚だけ残す。自動検査は「黒くない」までしか言えない。</summary>
+        IEnumerator Snap(string name)
+        {
+            var cam = Camera.main;
+            if (cam == null) yield break;
+            const int W = 960, H = 720;      // 4:3。シェーダが切る窓と同じ比
+            var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32,
+                                       RenderTextureReadWrite.sRGB);
+            var prev = cam.targetTexture;
+            cam.targetTexture = rt;
+            yield return null; yield return null; yield return null;
+
+            var tex = new Texture2D(W, H, TextureFormat.RGB24, false);
+            var active = RenderTexture.active;
+            RenderTexture.active = rt;
+            tex.ReadPixels(new Rect(0, 0, W, H), 0, 0);
+            tex.Apply();
+            RenderTexture.active = active;
+            cam.targetTexture = prev;
+
+            try
+            {
+                var path = System.IO.Path.GetFullPath("../artifacts/intro/" + name + ".png");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+                System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+                Line($"  画: {path}");
+            }
+            catch (System.Exception e) { Line("  画が書けない: " + e.Message); }
+            Destroy(tex);
+            rt.Release();
+            Destroy(rt);
         }
 
         /// <summary>検査の都合で、シーンを読み直さずに再生状態へ戻す。</summary>

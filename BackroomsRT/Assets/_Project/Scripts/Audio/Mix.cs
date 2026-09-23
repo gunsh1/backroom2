@@ -56,6 +56,12 @@ namespace Backrooms.Audio
         public const float Sting = 0.95f;
 
         /// <summary>
+        /// 落ちて床に倒れる音。自分の体がぶつかる音なので、部屋のどの音よりも
+        /// 近い。Sting と同じく、実際の大きさを決めているのは AGC の下限。
+        /// </summary>
+        public const float Impact = 0.85f;
+
+        /// <summary>
         /// 自分の叫び声。耳の位置では 85dBA 前後で、足音の +37dB になる。
         /// そのまま入れると 7.8 になって必ず振り切れる。実機のマイクは
         /// この時点で飽和していて、AGC が 0.12 秒で叩き落とす — それが

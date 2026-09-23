@@ -1,4 +1,4 @@
-=== SceneBuilder (photoreal) 2026/09/23 19:55:33 ===
+=== SceneBuilder (photoreal) 2026/09/23 21:05:59 ===
 遠くの声: female 7 本 / 平均 120 秒に 1 回 / 距離 18-34m
 === 無限生成 (ChunkedLevel0) ===
 チャンク 14.4 m 角 / 読み込み半径 4 (58 m) / ライトは半径 3 まで
@@ -100,6 +100,7 @@ footsteps: 実録音 Step_Carpet.wav を使用 (0.254s)
 camera: TAA High, 出力 52.17deg vFOV / 水平 66.27deg / 比率 1.333 (1440x1080) / レンダ 52.17deg (overscan 1.000), black background
 camera frame settings: RayTracing/SSGI/SSR/Volumetrics/SSShadows = on
 player rig built at (0.90, 0.00, 0.90) yaw 145, 6 capture views
+導入: 実写 intro.mp4 あり を 5 秒 -> 0.80 秒で落下 (目線 3.00m -> 0.26m) -> キーで起床
 ゲーム: テープ 15 分 / 出口はスポーンから 60 m / 脅威 徘徊 1.05 追跡 1.85 m/s (歩き 1.40 / 走り 3.60、息切れで 2.2)
   気付く 28 m / 見失う 45 m / 捕まる 1.6 m / 追跡の上限 90 秒
   保存: C:/Users/naoin/AppData/LocalLow/Found Footage/The Backrooms 1996\save.json

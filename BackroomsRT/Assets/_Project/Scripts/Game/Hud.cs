@@ -29,11 +29,26 @@ namespace Backrooms.Game
 
         GameSession _session;
         Canvas _canvas;
-        GameObject _scrim, _menu, _noclip;
+        GameObject _scrim, _menu, _noclip, _note;
+        Text _noteText;
         Text _title, _body;
         Button _resume, _restart, _quit;
         Phase _shown = (Phase)(-1);
         Backrooms.Player.FirstPersonController _fps;
+
+        /// <summary>
+        /// 一時的な一行。いまは倒れているときの「押して起きる」だけ。
+        /// テープの一部ではないので Canvas に出す。null で消える。
+        /// </summary>
+        [System.NonSerialized] public string Note;
+
+        // Screen Space Overlay の Canvas は カメラの targetTexture への
+        // 描画に写らない。自動検査が画で確かめられないので、出ているかを
+        // ここから読めるようにしておく。
+        /// <summary>案内の一行が実際に出ているか。</summary>
+        public bool NoteShown { get { return _note != null && _note.activeSelf; } }
+        /// <summary>暗幕 (ポーズ・死亡・クリアの札) が出ているか。</summary>
+        public bool ScrimShown { get { return _scrim != null && _scrim.activeSelf; } }
 
         void Start()
         {
@@ -52,6 +67,10 @@ namespace Backrooms.Game
             if (_fps == null) _fps = FindFirstObjectByType<Backrooms.Player.FirstPersonController>();
             bool fly = _fps != null && _fps.Noclip;
             if (_noclip != null && _noclip.activeSelf != fly) _noclip.SetActive(fly);
+
+            bool note = !string.IsNullOrEmpty(Note);
+            if (_note != null && _note.activeSelf != note) _note.SetActive(note);
+            if (note && _noteText != null && _noteText.text != Note) _noteText.text = Note;
         }
 
         void Refresh(bool force)
@@ -60,7 +79,8 @@ namespace Backrooms.Game
             if (!force && p == _shown) return;
             _shown = p;
 
-            bool show = p != Phase.Playing;
+            // 落ちてくる間は暗幕を出さない。ここで出すと画が全部隠れる。
+            bool show = p != Phase.Playing && p != Phase.Intro;
             _scrim.SetActive(show);
             if (!show) return;
 
@@ -145,6 +165,17 @@ namespace Backrooms.Game
             nr.anchoredPosition = new Vector2(28f, -28f);
             Label(nr, "Label", BodySize, Vector2.zero, FontStyle.Bold).text = "NOCLIP  M";
             _noclip.SetActive(false);
+
+            // 一行の案内。4:3 の窓の下端の内側。ピラーボックスの黒には載せない。
+            _note = Panel(fr, "Note", new Color(0f, 0f, 0f, 0.80f));
+            _note.GetComponent<Image>().raycastTarget = false;
+            var tr = _note.GetComponent<RectTransform>();
+            tr.anchorMin = tr.anchorMax = new Vector2(0.5f, 0f);
+            tr.pivot = new Vector2(0.5f, 0f);
+            tr.sizeDelta = new Vector2(460f, 54f);
+            tr.anchoredPosition = new Vector2(0f, 110f);
+            _noteText = Label(tr, "Label", BodySize, Vector2.zero, FontStyle.Normal);
+            _note.SetActive(false);
         }
 
         static Font Ui()

@@ -7,6 +7,8 @@ namespace Backrooms.Game
 {
     public enum Phase
     {
+        /// <summary>落ちてくる途中。操作はまだ渡していない。</summary>
+        Intro,
         /// <summary>撮っている。</summary>
         Playing,
         /// <summary>止めている。</summary>
@@ -57,6 +59,7 @@ namespace Backrooms.Game
         public string CardBody { get; private set; } = "";
 
         FirstPersonController _fps;
+        ColdOpen _cold;
         bool _quitting;
 
         void Awake()
@@ -73,6 +76,12 @@ namespace Backrooms.Game
         {
             _fps = FindFirstObjectByType<FirstPersonController>();
             SetPlaying();
+
+            // 入り方は一度きり。1 本目だけ、落ちてくるところから始める。
+            // ColdOpen 自身は Phase.Intro を見て動くので、決めるのはここ。
+            _cold = FindFirstObjectByType<ColdOpen>();
+            if (_cold != null && _cold.WouldPlay(Save.tapeNumber)) BeginIntro();
+
             Debug.Log($"[session] テープ {Tape.TapeNumber} 本目 / {Tape.Date:yyyy-MM-dd} / "
                       + $"殺された {Save.kills} 回 / 保存 {SaveData.Where}");
         }
@@ -83,7 +92,9 @@ namespace Backrooms.Game
             // ポーズは Esc で開き、Esc で閉じる。開いた手段で必ず閉じられること。
             if (Input.GetKeyDown(KeyCode.Escape))
             {
-                if (Current == Phase.Playing) SetPaused(true);
+                // 落ちている間の Esc は飛ばす。何も起きないキーを作らない。
+                if (Current == Phase.Intro) { if (_cold != null) _cold.Skip(); }
+                else if (Current == Phase.Playing) SetPaused(true);
                 else if (Current == Phase.Paused) SetPaused(false);
             }
         }
@@ -98,6 +109,24 @@ namespace Backrooms.Game
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
             if (_fps != null) _fps.enabled = true;
+        }
+
+        /// <summary>落ちてくるところから始める。操作はまだ渡さない。</summary>
+        public void BeginIntro()
+        {
+            Current = Phase.Intro;
+            Time.timeScale = 1f;
+            Tape.Running = true;          // テープはもう回っている
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            if (_fps != null) _fps.enabled = false;
+        }
+
+        /// <summary>立ち上がった。ここで操作を渡す。</summary>
+        public void EndIntro()
+        {
+            if (Current != Phase.Intro) return;
+            SetPlaying();
         }
 
         public void SetPaused(bool on)
