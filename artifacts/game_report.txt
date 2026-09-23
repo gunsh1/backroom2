@@ -1,0 +1,47 @@
+=== ゲームの自己検査 2026/09/23 20:03:07 ===
+
+組み立て
+  OK  GameSession  -> あり
+  OK  TapeState  -> 15 分
+  OK  Exit  -> (50.0, 35.3)
+  OK  Threat  -> 追跡 1.85 m/s
+  OK  Hud  -> あり
+  OK  テープ 1 本目から  -> 1 本目
+
+テープの時計
+  OK  止めなくても減る  -> 1 秒で 1.05 秒
+  OK  ライトがテープ残量を読む  -> 0.9988 / テープ 0.9988
+
+ポーズ
+  OK  止まる  -> Paused / timeScale 0.0
+  OK  カーソルが外れる  -> None
+  OK  止めている間はテープも止まる  -> 0.000 秒
+  OK  戻る  -> Playing / timeScale 1.0
+  OK  カーソルが必ず戻る  -> Locked
+
+息切れ
+  OK  走り続けると労力が上がりきる  -> 1.00 (14 秒)
+  OK  走る速さが落ちる  -> 係数 0.61 -> 2.20 m/s
+  OK  脅威より速いまま  -> 2.20 > 1.85
+
+終わり方 1: 捕まる
+  OK  死んだ状態になる  -> Dying
+  OK  殺された回数が増える  -> 1 回
+  OK  次のテープへ行く  -> NewTape
+  OK  テープ番号が進む  -> 1 -> 2
+  OK  日付が進む  -> AUG 20 1996
+
+終わり方 2: テープ切れ
+  OK  尽きたら終わる  -> RunOut
+  OK  尽きた回数が増える  -> 1 回
+  OK  テープ番号が進む  -> 2 -> 3
+
+終わり方 3: 脱出
+  OK  出口に入ると脱出になる  -> Escaped
+  OK  脱出が記録される  -> true
+
+保存
+  OK  読み直せる  -> テープ 3 / 殺された 1 / 尽きた 1
+  場所: C:/Users/naoin/AppData/LocalLow/Found Footage/The Backrooms 1996\save.json
+
+RESULT: OK

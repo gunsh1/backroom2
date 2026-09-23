@@ -57,8 +57,10 @@ namespace Backrooms.Player
         public float ShakePanic = 1.0f;
         [Tooltip("動悸が残っている間のカメラの揺れ")]
         public float ShakeAfter = 0.10f;
-        [Tooltip("最大時に足の速さへ掛ける増分。1.0 で 2 倍")]
-        public float SpeedBoost = 1.0f;
+        // 1.0 (2 倍) だと、E で自分からイベントを出して逃走に使えてしまう。
+        // 驚いて足が出る、の範囲に留める。
+        [Tooltip("最大時に足の速さへ掛ける増分。0.25 で 1.25 倍")]
+        public float SpeedBoost = 0.25f;
         /// <summary>
         /// イベント中に AGC が絞れる下限。1 = 絞らない、1 より上 = 逆に押し上げる。
         /// AudioSource.volume は 1.0 で頭打ちなので、音源側をいくら上げても
@@ -149,7 +151,10 @@ namespace Backrooms.Player
 
             // テスト用。抽選を待たずに必ず起こす。確率は減らさない。
             // Shout と同じく、窓が前面に無いときの入力は見ない。
-            if (AutoRoll && Application.isFocused && Input.GetKeyDown(TestKey)) Fire(false);
+            // テスト用のキーはエディタでだけ生かす。製品に「驚かしを
+            // 出すキー」が残っていると、それはもう仕掛けではない。
+            if (Application.isEditor && AutoRoll && Application.isFocused
+                && Input.GetKeyDown(TestKey)) Fire(false);
 
             if (_active)
             {

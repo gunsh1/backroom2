@@ -64,6 +64,13 @@ namespace Backrooms.Player
         /// <summary>差し込み入力での走り。息の上がり方はここでしか試せない。</summary>
         [System.NonSerialized] public bool ExternalSprint;
 
+        /// <summary>
+        /// 走る速さに掛ける係数。1 で元気、小さいほど息が上がっている。
+        /// Breathing が書く。SprintSpeed を直接書き換えないのは、
+        /// PanicEvent が同じ値を握っていて上書き合戦になるから。
+        /// </summary>
+        [System.NonSerialized] public float SprintFactor = 1f;
+
         CharacterController _cc;
         Vector3 _velocity;
         float _yaw, _pitch;
@@ -92,18 +99,18 @@ namespace Backrooms.Player
 
         void Start()
         {
+            // カーソルの掴み外しは GameSession が持つ。ここで掴むと、
+            // ポーズ中に誰かが勝手に掴み直すことになる。GameSession が
+            // 居ない場面 (キャプチャ、単体での確認) だけ自分で掴む。
             if (FindFirstObjectByType<Backrooms.Capture.FlatCaptureRunner>() != null) return;
+            if (FindFirstObjectByType<Backrooms.Game.GameSession>() != null) return;
             LockCursor(true);
         }
 
         void Update()
         {
             SteppedThisFrame = false;
-            if (!UseExternalInput)
-            {
-                HandleCursor();
-                HandleLook();
-            }
+            if (!UseExternalInput) HandleLook();
             HandleCrouch();
             HandleMove();
             ApplyHeadMotion();
@@ -114,13 +121,6 @@ namespace Backrooms.Player
         {
             Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !locked;
-        }
-
-        void HandleCursor()
-        {
-            // Esc で解放し、クリックで必ず戻せるようにしておく
-            if (Input.GetKeyDown(KeyCode.Escape)) LockCursor(false);
-            if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked) LockCursor(true);
         }
 
         void HandleLook()
@@ -175,7 +175,8 @@ namespace Backrooms.Player
             if (input.sqrMagnitude > 1f) input.Normalize();
 
             IsSprinting = sprintHeld && !IsCrouching && input.y > 0.1f;
-            float target = IsCrouching ? CrouchSpeed : (IsSprinting ? SprintSpeed : WalkSpeed);
+            float target = IsCrouching ? CrouchSpeed
+                         : (IsSprinting ? SprintSpeed * Mathf.Max(0.1f, SprintFactor) : WalkSpeed);
 
             Vector3 wish = (transform.right * input.x + transform.forward * input.y) * target;
             Vector3 horizontal = new Vector3(_velocity.x, 0f, _velocity.z);

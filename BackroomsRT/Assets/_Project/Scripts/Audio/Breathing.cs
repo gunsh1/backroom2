@@ -43,6 +43,12 @@ namespace Backrooms.Audio
         [Tooltip("やめてから収まるまで (秒)。上がるより遅くすること")]
         public float FallSeconds = 35f;
 
+        [Header("息切れ")]
+        [Tooltip("息が上がりきったときに走る速さへ掛ける係数。3.6 x 0.61 = 2.2 m/s")]
+        public float TiredFraction = 0.61f;
+        [Tooltip("この労力を超えたら遅くなり始める")]
+        public float TireFrom = 0.85f;
+
         [Header("異常時")]
         [Tooltip("Heavy に完全に入れ替わったときの追加の速さ")]
         public float PanicRate = 0.15f;
@@ -158,6 +164,15 @@ namespace Backrooms.Audio
             Rate = Mathf.Lerp(1f, MaxRate, Effort) + p * PanicRate + afterOnly * AfterRate;
             _rate = Rate;
             _mix = p;
+            // 息が上がると走れなくなる。ゲージは出さない。息の音で伝える。
+            // 2.2 m/s は脅威の 1.85 より上に保つこと。下回ると、疲れた時点で
+            // 逃げ切れなくなり「走って逃げる」という約束が壊れる。
+            if (_fps != null)
+            {
+                float tired = Mathf.InverseLerp(TireFrom, 1f, Effort);
+                _fps.SprintFactor = Mathf.Lerp(1f, Mathf.Clamp01(TiredFraction), tired);
+            }
+
             _gain = Volume * Mathf.Lerp(1f, LoudGain, Effort)
                            * Mathf.Lerp(1f, PanicGain, p)
                            * Mathf.Lerp(1f, AfterGain, afterOnly);

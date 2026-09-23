@@ -111,6 +111,12 @@ namespace Backrooms.Post
             _mat.SetFloat(ID.Grain, grain.value);
             _mat.SetFloat(ID.Fisheye, fisheye.value * intensity.value);
             _mat.SetFloat(ID.Pillar, pillarbox.value ? 1f : 0f);
+            // ビューファインダ。値は TapeState が Game.Osd に置く。
+            _mat.SetFloat(ID.Osd, Game.Osd.Enabled ? 1f : 0f);
+            _mat.SetVector(ID.OsdTime, new Vector4(Game.Osd.Hours, Game.Osd.Minutes,
+                                                   Game.Osd.Seconds, 0f));
+            _mat.SetFloat(ID.OsdTape, Game.Osd.Tape01);
+            _mat.SetFloat(ID.OsdRec, Game.Osd.Rec ? 1f : 0f);
             _mat.SetTexture(ID.MainTex, source);
             HDUtils.DrawFullScreen(cmd, _mat, destination, shaderPassId: 0);
         }
@@ -136,6 +142,10 @@ namespace Backrooms.Post
             public static readonly int Grain = Shader.PropertyToID("_Grain");
             public static readonly int Fisheye = Shader.PropertyToID("_Fisheye");
             public static readonly int Pillar = Shader.PropertyToID("_Pillar");
+            public static readonly int Osd = Shader.PropertyToID("_Osd");
+            public static readonly int OsdTime = Shader.PropertyToID("_OsdTime");
+            public static readonly int OsdTape = Shader.PropertyToID("_OsdTape01");
+            public static readonly int OsdRec = Shader.PropertyToID("_OsdRec");
         }
     }
 }

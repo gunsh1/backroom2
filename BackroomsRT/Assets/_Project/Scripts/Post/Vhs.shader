@@ -52,8 +52,70 @@ Shader "Hidden/Backrooms/Vhs"
     float  _Fisheye;        // 広角レンズの樽型歪み
     float  _Pillar;         // 4:3 に切り詰めるか
 
+    // ビューファインダの表示。テープに焼かれる前の、記録時に合成される信号。
+    float  _Osd;            // 0 で出さない (参照画像の撮影時)
+    float4 _OsdTime;        // 時, 分, 秒, フレーム
+    float  _OsdTape01;      // テープ残量 1..0
+    float  _OsdRec;         // REC の点滅 0/1
+
     // テープの縦横比。VHS-C は 4:3 しかない。
     #define TAPE_ASPECT (4.0 / 3.0)
+
+    // ---- ビューファインダの文字 -------------------------------------
+    // 1996 年の民生機のキャラクタジェネレータは 7 セグで数字を出す。
+    // フォントのアトラスを持たずに済むうえ、それが当時の正しい見た目でもある。
+    // a=1 b=2 c=4 d=8 e=16 f=32 g=64
+    static const uint SEG7[10] =
+    {
+        0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
+    };
+
+    float Box(float2 p, float2 a, float2 b)
+    {
+        float2 s = step(a, p) * step(p, b);
+        return s.x * s.y;
+    }
+
+    // 文字の箱は幅 0.62 高さ 1.0。p はその中の座標。
+    float Digit(float2 p, uint d)
+    {
+        if (p.x < -0.02 || p.x > 0.64 || p.y < -0.02 || p.y > 1.02) return 0.0;
+        uint m = SEG7[min(d, 9u)];
+        float v = 0.0;
+        if (m & 1u)  v += Box(p, float2(0.13, 0.88), float2(0.49, 1.00));  // a
+        if (m & 2u)  v += Box(p, float2(0.50, 0.53), float2(0.62, 0.95));  // b
+        if (m & 4u)  v += Box(p, float2(0.50, 0.05), float2(0.62, 0.47));  // c
+        if (m & 8u)  v += Box(p, float2(0.13, 0.00), float2(0.49, 0.12));  // d
+        if (m & 16u) v += Box(p, float2(0.00, 0.05), float2(0.12, 0.47));  // e
+        if (m & 32u) v += Box(p, float2(0.00, 0.53), float2(0.12, 0.95));  // f
+        if (m & 64u) v += Box(p, float2(0.13, 0.44), float2(0.49, 0.56));  // g
+        return saturate(v);
+    }
+
+    float Colon(float2 p)
+    {
+        return saturate(Box(p, float2(0.02, 0.18), float2(0.14, 0.30))
+                      + Box(p, float2(0.02, 0.62), float2(0.14, 0.74)));
+    }
+
+    // 左下を原点に、HH:MM:SS を描く。h は文字の高さ (uv の y)。
+    float Timecode(float2 uv, float2 at, float h, float3 t)
+    {
+        float aspect = TAPE_ASPECT;
+        // x は 4:3 ぶん詰まっているので、文字が縦長にならないよう割る。
+        float2 p = float2((uv.x - at.x) * aspect / h, (uv.y - at.y) / h);
+        float adv = 0.74, colw = 0.34;
+        float v = 0.0;
+        float x = 0.0;
+        [unroll] for (int k = 0; k < 3; k++)
+        {
+            uint n = (uint)clamp(k == 0 ? t.x : (k == 1 ? t.y : t.z), 0.0, 99.0);
+            v += Digit(float2(p.x - x, p.y), n / 10u); x += adv;
+            v += Digit(float2(p.x - x, p.y), n % 10u); x += adv;
+            if (k < 2) { v += Colon(float2(p.x - x, p.y)); x += colw; }
+        }
+        return saturate(v);
+    }
 
     float Hash21(float2 p)
     {
@@ -194,6 +256,38 @@ Shader "Hidden/Backrooms/Vhs"
         // 緑を上げたぶんを赤で相殺して、輝度は動かさない。
         float3 wb = float3(1.0 - 0.392 * _Tint, 1.0 + 0.18 * _Tint, 1.0 + 0.10 * _Tint);
         col *= lerp(1.0, wb, k);
+
+        // ---- ビューファインダの表示 ----------------------------------
+        // テープに焼かれた後の信号ではなく、記録時に合成されたもの。
+        // だからドロップアウト・走査線・グレインより「手前」に置いて、
+        // 以降の劣化を一緒に受けさせる。これが「カメラの中で出ている」
+        // ことの手掛かりになる。後から重ねた字は必ず浮く。
+        if (_Osd > 0.5)
+        {
+            float osd = 0.0;
+
+            // REC の赤丸。実機は赤ではなく白で出る機種も多いが、
+            // 赤のほうが「録っている」ことが一目で分かる。
+            if (_OsdRec > 0.5)
+            {
+                float2 d = float2((uv.x - 0.075) * TAPE_ASPECT, uv.y - 0.912);
+                osd += 1.0 - smoothstep(0.0100, 0.0125, length(d));
+            }
+
+            // タイムコード。右下。
+            osd += Timecode(uv, float2(0.700, 0.052), 0.026, _OsdTime.xyz);
+
+            // テープ残量。左下の細い帯。枠と中身。
+            float2 b0 = float2(0.060, 0.052), b1 = float2(0.280, 0.062);
+            float frame = Box(uv, b0 - 0.0015, b1 + 0.0015) - Box(uv, b0, b1);
+            float fill = Box(uv, b0, float2(lerp(b0.x, b1.x, saturate(_OsdTape01)), b1.y));
+            osd += saturate(frame) + fill;
+
+            // 画と同じ利得を通す。白のまま乗せると、そこだけ
+            // 色かぶりも彩度落ちも受けていない字になって浮く。
+            float3 ink = float3(0.85, 0.85, 0.85) * lerp(1.0, wb, k);
+            col = lerp(col, ink, saturate(osd) * 0.92);
+        }
 
         // ---- ドロップアウト -----------------------------------------
         // 磁性体が欠けた区間は信号が拾えない。ただし VCR には 1H 遅延の

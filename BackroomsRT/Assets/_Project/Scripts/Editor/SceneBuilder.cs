@@ -44,6 +44,7 @@ namespace Backrooms.EditorTools
         static float _lookAhead = 0f;
         static bool _vhs = false;        // VHS ポストを載せるか
         static bool _audio = false;      // 音を載せるか
+        static bool _game = false;       // ゲームとして成立させる部品を載せるか
         static float _aspect = 16f / 9f;  // 記録媒体の縦横比
         static int _outW = 1920, _outH = 1080;
 
@@ -126,6 +127,7 @@ namespace Backrooms.EditorTools
             _mediumGain = Color.white;
             _vhs = true;
             _audio = true;
+            _game = true;
             EnsureVhsRegistered();
             BuildWith(InfiniteWorld);
         }
@@ -361,6 +363,7 @@ namespace Backrooms.EditorTools
             BuildDecals(geo);
             BuildVolume();
             BuildPlayer(geo);
+            if (_game) BuildGame(geo);
 
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -523,6 +526,39 @@ namespace Backrooms.EditorTools
         /// タイリングするので、手擦れや水の垂れのような一点物をテクスチャに
         /// 焼くと必ず等間隔で並んで見える。位置は生成器が決める。
         /// </summary>
+        /// <summary>
+        /// 勝てて負けられて止められる、ための部品。
+        ///
+        /// prefab は作らない。このプロジェクトは全部コードから建てる流儀で、
+        /// その値打ちは「シーンが何度でも無損失に作り直せる」ことにある。
+        /// 手でシーンに置いた物があると、メニューを 1 回押しただけで消える。
+        /// </summary>
+        static void BuildGame(Level0Generator.Result geo)
+        {
+            var root = new GameObject("Game");
+            var tape = root.AddComponent<Backrooms.Game.TapeState>();
+            var session = root.AddComponent<Backrooms.Game.GameSession>();
+            root.AddComponent<Backrooms.Game.Hud>();
+
+            var exitGo = new GameObject("Exit");
+            exitGo.transform.position = geo.Spawn;
+            var exit = exitGo.AddComponent<Backrooms.Game.Exit>();
+
+            var threatGo = new GameObject("Threat");
+            var threat = threatGo.AddComponent<Backrooms.Game.Threat>();
+            // 仮の声。安定器のうなりを落としたものを M-B で作るまでの間に合わせ。
+            threat.Voice = LoadAudio("Assets/_Project/Audio/Sting_Horror.wav");
+
+            Log.Add($"ゲーム: テープ {tape.TotalSeconds / 60f:F0} 分 / "
+                    + $"出口はスポーンから {exit.DistanceFromSpawn:F0} m / "
+                    + $"脅威 徘徊 {threat.RoamSpeed:F2} 追跡 {threat.HuntSpeed:F2} m/s "
+                    + $"(歩き 1.40 / 走り 3.60、息切れで 2.2)");
+            Log.Add($"  気付く {threat.NoticeRange:F0} m / 見失う {threat.LoseRange:F0} m / "
+                    + $"捕まる {threat.KillRange:F1} m / 追跡の上限 {threat.MaxHuntSeconds:F0} 秒");
+            Log.Add($"  保存: {Backrooms.Game.SaveData.Where}");
+            _ = session;
+        }
+
         static void BuildDecals(Level0Generator.Result geo)
         {
             var root = new GameObject("Decals");

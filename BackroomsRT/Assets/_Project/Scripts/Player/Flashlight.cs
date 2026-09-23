@@ -6,7 +6,12 @@ using UnityEngine.Rendering.HighDefinition;
 namespace Backrooms.Player
 {
     /// <summary>
-    /// 手持ちライト。バッテリ残量が体験の長さを決める。
+    /// 手持ちライト。
+    ///
+    /// もとは 18 分の電池を自前で持っていたが、時計を 2 つ持つと必ず
+    /// 食い違う。残量は TapeState から読むだけにした。副産物として、
+    /// すでに調整済みの「残り 22% から弱り始める」が「毎テープの最後の
+    /// 3 分 18 秒でライトが死んでいく」に変わる。独立した 2 系統より良い。
     ///
     /// フォトリアルの観点では、均一な円錐を投げる懐中電灯が最も嘘に見える。
     /// 実物はホットスポットと周辺の落ち込みを持ち、電池が減ると光量だけでなく
@@ -15,9 +20,7 @@ namespace Backrooms.Player
     public class Flashlight : MonoBehaviour
     {
         [Header("バッテリ")]
-        [Tooltip("新品からの持続時間（分）。ここが体験の長さを決める")]
-        public float BatteryMinutes = 18f;
-        [Tooltip("残りこの割合を切ると弱り始める")]
+        [Tooltip("残りこの割合を切ると弱り始める。テープ残量に対する割合")]
         public float FadeStartFraction = 0.22f;
 
         [Header("光")]
@@ -33,13 +36,16 @@ namespace Backrooms.Player
 
         public Light Light { get; private set; }
         public bool On { get; private set; }
-        public float Battery01 { get; private set; } = 1f;
-        public bool Dead { get; private set; }
-        /// <summary>バッテリが尽きた瞬間に一度だけ発火する。</summary>
-        public event Action OnBatteryDead;
+        /// <summary>テープ残量の読み出し。TapeState が無い場面では常に新品。</summary>
+        public float Battery01
+        {
+            get { return _tape != null ? _tape.Remaining01 : _standalone; }
+        }
+        public bool Dead { get { return Battery01 <= 0f; } }
 
         HDAdditionalLightData _hd;
-        float _drained;
+        Backrooms.Game.TapeState _tape;
+        float _standalone = 1f;
         float _flickerSeed;
 
         void Awake()
@@ -68,20 +74,10 @@ namespace Backrooms.Player
 
         void Update()
         {
-            if (!Dead && Input.GetKeyDown(ToggleKey)) On = !On;
-
-            if (On && !Dead)
-            {
-                _drained += Time.deltaTime;
-                float total = Mathf.Max(1f, BatteryMinutes * 60f);
-                Battery01 = Mathf.Clamp01(1f - _drained / total);
-                if (Battery01 <= 0f)
-                {
-                    Dead = true;
-                    On = false;
-                    OnBatteryDead?.Invoke();
-                }
-            }
+            if (_tape == null) _tape = FindFirstObjectByType<Backrooms.Game.TapeState>();
+            // 書き出し中や単体での確認では、誰かが押した F を拾わない。
+            if (Application.isFocused && !Dead && Input.GetKeyDown(ToggleKey)) On = !On;
+            if (Dead) On = false;
 
             Light.enabled = On;
             if (!On) return;
@@ -103,12 +99,11 @@ namespace Backrooms.Player
             Light.colorTemperature = Mathf.Lerp(DeadTemperature, PeakTemperature, health);
         }
 
-        /// <summary>キャプチャ・デバッグ用。</summary>
+        /// <summary>キャプチャ・デバッグ用。TapeState が無い場面でだけ残量も効く。</summary>
         public void ForceState(bool on, float battery01 = 1f)
         {
+            _standalone = Mathf.Clamp01(battery01);
             On = on && !Dead;
-            Battery01 = Mathf.Clamp01(battery01);
-            _drained = (1f - Battery01) * BatteryMinutes * 60f;
             Light.enabled = On;
         }
     }

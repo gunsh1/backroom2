@@ -65,6 +65,7 @@ switch ($Task) {
     "infinite"  { Invoke-Unity "Backrooms.EditorTools.SceneBuilder.BuildInfiniteScene" "unity_infinite.log" | Out-Null }
     "audio"     { Invoke-Unity "Backrooms.EditorTools.AudioProbe.Run"              "unity_audio.log" | Out-Null }
     "capture"   { Invoke-Unity "Backrooms.EditorTools.CaptureTool.PlayAndCapture"  "unity_capture.log" -Gui | Out-Null }
+    "gametest"  { Invoke-Unity "Backrooms.EditorTools.GameTestTool.PlayAndTest"    "unity_gametest.log" -Gui | Out-Null }
     "open" {
         Assert-NoEditor
         Write-Host "エディタを開く: $Project" -ForegroundColor Cyan
@@ -77,10 +78,10 @@ switch ($Task) {
         Invoke-Unity "Backrooms.EditorTools.SceneBuilder.Build"         "unity_scene.log"   | Out-Null
         Invoke-Unity "Backrooms.EditorTools.CaptureTool.PlayAndCapture" "unity_capture.log" -Gui | Out-Null
     }
-    default { throw "unknown task: $Task  (open|setup|materials|scene|replica|infinite|audio|capture|all)" }
+    default { throw "unknown task: $Task  (open|setup|materials|scene|replica|infinite|audio|capture|gametest|all)" }
 }
 
-foreach ($r in @("setup_report.txt", "material_report.txt", "scene_report.txt", "capture_report.txt", "audio_report.txt")) {
+foreach ($r in @("setup_report.txt", "material_report.txt", "scene_report.txt", "capture_report.txt", "audio_report.txt", "game_report.txt")) {
     $p = Join-Path $Artifacts $r
     if (Test-Path $p) { Write-Host "report: $p" -ForegroundColor DarkGray }
 }

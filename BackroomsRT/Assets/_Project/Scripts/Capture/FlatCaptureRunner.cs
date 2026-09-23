@@ -100,6 +100,9 @@ namespace Backrooms.Capture
             var panicRef = FindFirstObjectByType<Player.PanicEvent>();
             if (panicRef != null) panicRef.AutoRoll = false;
 
+            // 参照画像にタイムコードが写ると、見た目の前後比較が使えなくなる。
+            Backrooms.Game.Osd.Enabled = false;
+
             _log.Add("=== capture ===");
             _log.Add("graphicsDeviceType : " + SystemInfo.graphicsDeviceType);
             _log.Add("graphicsDeviceName : " + SystemInfo.graphicsDeviceName);
