@@ -29,10 +29,11 @@ namespace Backrooms.Game
 
         GameSession _session;
         Canvas _canvas;
-        GameObject _scrim, _menu;
+        GameObject _scrim, _menu, _noclip;
         Text _title, _body;
         Button _resume, _restart, _quit;
         Phase _shown = (Phase)(-1);
+        Backrooms.Player.FirstPersonController _fps;
 
         void Start()
         {
@@ -45,6 +46,12 @@ namespace Backrooms.Game
         {
             if (_session == null) { _session = GameSession.Instance; return; }
             Refresh(false);
+
+            // すり抜け中はそう出す。出さないと「なぜ死なないのか」が
+            // 分からなくなり、調べている当人が一番混乱する。
+            if (_fps == null) _fps = FindFirstObjectByType<Backrooms.Player.FirstPersonController>();
+            bool fly = _fps != null && _fps.Noclip;
+            if (_noclip != null && _noclip.activeSelf != fly) _noclip.SetActive(fly);
         }
 
         void Refresh(bool force)
@@ -121,6 +128,23 @@ namespace Backrooms.Game
                                () => { if (_session != null) _session.Quit(); });
 
             _scrim.SetActive(false);
+
+            // デバッグの札は暗幕の外。ポーズしていなくても出る必要がある。
+            var frame = new GameObject("Frame", typeof(RectTransform));
+            frame.transform.SetParent(go.transform, false);
+            var fr = frame.GetComponent<RectTransform>();
+            fr.anchorMin = fr.anchorMax = new Vector2(0.5f, 0.5f);
+            fr.sizeDelta = new Vector2(1440f, 1080f);
+
+            _noclip = Panel(fr, "Noclip", new Color(0f, 0f, 0f, 0.85f));
+            _noclip.GetComponent<Image>().raycastTarget = false;
+            var nr = _noclip.GetComponent<RectTransform>();
+            nr.anchorMin = nr.anchorMax = new Vector2(0f, 1f);
+            nr.pivot = new Vector2(0f, 1f);
+            nr.sizeDelta = new Vector2(220f, 48f);
+            nr.anchoredPosition = new Vector2(28f, -28f);
+            Label(nr, "Label", BodySize, Vector2.zero, FontStyle.Bold).text = "NOCLIP  M";
+            _noclip.SetActive(false);
         }
 
         static Font Ui()

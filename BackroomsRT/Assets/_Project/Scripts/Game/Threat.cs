@@ -157,7 +157,10 @@ namespace Backrooms.Game
             Move(dt, Mode == ThreatMode.Hunt ? HuntSpeed : RoamSpeed);
             Sound(dt);
 
-            if (Mode == ThreatMode.Hunt && DistanceToPlayer <= KillRange && session != null)
+            // すり抜け中は捕まえない。姿がまだ無いので避けようがなく、
+            // 見に行った瞬間に殺されると確かめられない。
+            if (Mode == ThreatMode.Hunt && DistanceToPlayer <= KillRange && session != null
+                && (_fps == null || !_fps.Noclip))
                 session.Kill();
         }
 

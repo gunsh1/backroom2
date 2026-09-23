@@ -30,6 +30,14 @@ namespace Backrooms.Player
         public float MouseSensitivity = 2.2f;   // レガシー入力の Mouse X/Y は既に平滑化済み
         public float PitchLimit = 85f;
 
+        [Header("デバッグ")]
+        [Tooltip("すり抜けの切り替え。エディタでだけ効く")]
+        public KeyCode NoclipKey = KeyCode.M;
+        [Tooltip("すり抜け中の速さ (m/s)")]
+        public float FlySpeed = 6f;
+        [Tooltip("すり抜け中に Shift を押したときの速さ (m/s)")]
+        public float FlyFast = 18f;
+
         [Header("歩行に伴う視点の揺れ（控えめに）")]
         public float StepFrequency = 1.9f;   // 歩/秒。1.4m/s なら歩幅 0.74m
         public float BobVertical = 0.012f;   // m
@@ -40,6 +48,16 @@ namespace Backrooms.Player
         public bool IsSprinting { get; private set; }
         public bool IsCrouching { get; private set; }
         public float SpeedNormalized { get; private set; }
+
+        /// <summary>
+        /// すり抜けて飛んでいる。壁も床も天井も重力も無視する。
+        ///
+        /// 当たり判定は切らずに残すこと。CharacterController を disable すると
+        /// コライダごと消えて、出口のトリガーが反応しなくなる。Move() を
+        /// 呼ばずに transform を直接書くだけで壁は抜けられる。
+        /// CharacterController が押し戻すのは Move() の中だけなので。
+        /// </summary>
+        public bool Noclip { get; private set; }
         /// <summary>接地した瞬間に立つフラグ。足音のトリガに使う。</summary>
         public bool SteppedThisFrame { get; private set; }
         /// <summary>いま踏んだのが左足か。足音を左右で撃ち分けるのに使う。</summary>
@@ -110,7 +128,13 @@ namespace Backrooms.Player
         void Update()
         {
             SteppedThisFrame = false;
+
+            // デバッグ専用。製品に「壁を抜けるキー」を残さない。V キーと同じ扱い。
+            if (Application.isEditor && Application.isFocused && !UseExternalInput
+                && Input.GetKeyDown(NoclipKey)) SetNoclip(!Noclip);
+
             if (!UseExternalInput) HandleLook();
+            if (Noclip) { HandleFly(); return; }
             HandleCrouch();
             HandleMove();
             ApplyHeadMotion();
@@ -189,6 +213,73 @@ namespace Backrooms.Player
 
             Vector3 flat = new Vector3(_cc.velocity.x, 0f, _cc.velocity.z);
             SpeedNormalized = Mathf.Clamp01(flat.magnitude / SprintSpeed);
+        }
+
+        /// <summary>
+        /// すり抜け移動。重力も慣性も足音も無い。見ている方へ飛ぶ。
+        /// 上を向いて W で天井裏へ上がれるほうが、歩いて確かめるより早い。
+        /// </summary>
+        void HandleFly()
+        {
+            IsSprinting = false;
+            IsCrouching = false;
+            SpeedNormalized = 0f;
+            _velocity = Vector3.zero;
+
+            Vector2 input = ExternalMove;
+            bool fast = ExternalSprint;
+            float lift = 0f;
+            if (!UseExternalInput)
+            {
+                input = Vector2.zero;
+                if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) input.y += 1f;
+                if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) input.y -= 1f;
+                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) input.x += 1f;
+                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) input.x -= 1f;
+                if (Input.GetKey(KeyCode.Space)) lift += 1f;
+                if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C)) lift -= 1f;
+                fast = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            }
+
+            Vector3 wish = Quaternion.Euler(_pitch, _yaw, 0f) * new Vector3(input.x, 0f, input.y)
+                         + Vector3.up * lift;
+            if (wish.sqrMagnitude > 1f) wish.Normalize();
+
+            // Move() を通さない。通すと壁で止まる。
+            transform.position += wish * ((fast ? FlyFast : FlySpeed) * Time.deltaTime);
+
+            _currentHeight = StandHeight;
+            ApplyHeight(StandHeight);
+            Head.localPosition = new Vector3(0f, StandHeight + EyeOffset, 0f);
+            Head.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+        }
+
+        /// <summary>
+        /// すり抜けを切り替える。切るときは壁の中から救い出す。
+        /// 壁や天井裏で解除されると、次の Move() で弾き飛ばされるので。
+        /// </summary>
+        public void SetNoclip(bool on)
+        {
+            if (Noclip == on) return;
+            Noclip = on;
+            _velocity = Vector3.zero;
+            _bobPhase = 0f;
+            if (on) { Debug.Log("[noclip] on"); return; }
+
+            // 間取りは純粋関数なので、いちばん近い開いた場所をその場で聞ける。
+            int seed = 1996;
+            var world = FindFirstObjectByType<Backrooms.Generation.ChunkedLevel0>();
+            if (world != null) seed = world.Seed;
+
+            var p = transform.position;
+            if (!Backrooms.Generation.Level0Layout.Clear(p.x, p.z, seed, _cc.radius))
+                p = Backrooms.Generation.Level0Layout.FindOpen(p, seed);
+            p.y = 0f;                      // 天井裏に居たぶんを床へ戻す
+
+            _cc.enabled = false;
+            transform.position = p;
+            _cc.enabled = true;
+            Debug.Log($"[noclip] off / ({p.x:F1}, {p.z:F1})");
         }
 
         void ApplyHeadMotion()

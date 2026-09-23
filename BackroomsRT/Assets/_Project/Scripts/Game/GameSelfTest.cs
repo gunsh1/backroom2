@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Text;
 using UnityEngine;
+using Backrooms.Generation;
 using Backrooms.Player;
 
 namespace Backrooms.Game
@@ -125,6 +126,77 @@ namespace Backrooms.Game
             else Check("Breathing", false, "無し");
             _ = before;
 
+            // --- すり抜け (デバッグ)
+            Line("");
+            Line("すり抜け (M キー)");
+            if (fps != null)
+            {
+                int seed = 1996;
+                var world = FindFirstObjectByType<ChunkedLevel0>();
+                if (world != null) seed = world.Seed;
+
+                // 近くの壁の中の 1 点を探す。そこに留まれれば当たり判定を
+                // 通っていない証拠になる。
+                Vector3 me = fps.transform.position;
+                Vector3 inWall = me;
+                bool found = false;
+                for (float r = 1.0f; r < 14f && !found; r += 0.35f)
+                    for (int a = 0; a < 24 && !found; a++)
+                    {
+                        float t = a * Mathf.PI / 12f;
+                        float x = me.x + Mathf.Cos(t) * r, z = me.z + Mathf.Sin(t) * r;
+                        if (Level0Layout.Solid(x, z, seed))
+                        { inWall = new Vector3(x, 0f, z); found = true; }
+                    }
+                Check("近くに壁がある", found, found ? $"({inWall.x:F1}, {inWall.z:F1})" : "無し");
+
+                fps.SetNoclip(true);
+                Check("すり抜けが入る", fps.Noclip, fps.Noclip ? "on" : "off");
+                var cc = fps.GetComponent<CharacterController>();
+                Check("当たり判定は残したまま (出口のトリガーに要る)",
+                      cc != null && cc.enabled, cc == null ? "無し" : (cc.enabled ? "enabled" : "disabled"));
+
+                fps.SetPose(inWall + Vector3.up * 1.0f, 0f, 0f);
+                yield return null; yield return null; yield return null;
+                var now = fps.transform.position;
+                Check("壁の中に留まれる", Level0Layout.Solid(now.x, now.z, seed),
+                      $"({now.x:F1}, {now.z:F1})");
+
+                float y0 = fps.transform.position.y;
+                yield return new WaitForSeconds(0.6f);
+                Check("落ちない", Mathf.Abs(fps.transform.position.y - y0) < 0.02f,
+                      $"0.6 秒で {fps.transform.position.y - y0:F3} m");
+
+                // 脅威に捕まらないこと。姿が無いので避けようがない。
+                if (threat != null)
+                {
+                    if (torch != null) torch.ForceState(true, 1f);
+                    float w = 0f;
+                    while (w < 10f && threat.Mode != ThreatMode.Hunt)
+                    {
+                        threat.transform.position = fps.transform.position;
+                        w += Time.deltaTime;
+                        yield return null;
+                    }
+                    Check("脅威が追跡状態になる", threat.Mode == ThreatMode.Hunt,
+                          $"{threat.Mode} ({w:F0} 秒)");
+                    threat.transform.position = fps.transform.position;
+                    yield return null; yield return null;
+                    Check("すり抜け中は捕まらない", s.Current == Phase.Playing,
+                          $"距離 {threat.DistanceToPlayer:F2} m / {s.Current}");
+                    if (torch != null) torch.ForceState(false, 0f);
+                    threat.enabled = false;
+                    Line("  (以降の検査のため脅威を止める)");
+                }
+
+                fps.SetNoclip(false);
+                yield return null;
+                var back = fps.transform.position;
+                Check("切ると壁の外へ戻る", !Level0Layout.Solid(back.x, back.z, seed),
+                      $"({back.x:F1}, {back.z:F1})");
+            }
+            else Check("FirstPersonController", false, "無し");
+
             // --- 捕まる
             Line("");
             Line("終わり方 1: 捕まる");
@@ -172,6 +244,21 @@ namespace Backrooms.Game
             }
             Check("出口に入ると脱出になる", s.Current == Phase.Escaped, s.Current.ToString());
             Check("脱出が記録される", s.Save.escaped, s.Save.escaped ? "true" : "false");
+
+            // すり抜けたままでも出口は効くこと。当たり判定を残している証拠で、
+            // これが崩れると「飛んで出口まで行って試す」ができなくなる。
+            if (fps != null && exit != null)
+            {
+                tape.Load(s.Save.tapeNumber);
+                RestartSession(s);
+                fps.SetNoclip(true);
+                fps.SetPose(exit.Where + Vector3.forward * 14f, 0f, 0f);   // 一度箱から出る
+                yield return null; yield return null; yield return null;
+                fps.SetPose(exit.Where + Vector3.up * 0.1f, 0f, 0f);
+                yield return new WaitForSeconds(0.4f);
+                Check("すり抜け中でも出口は効く", s.Current == Phase.Escaped, s.Current.ToString());
+                fps.SetNoclip(false);
+            }
 
             // --- 保存が残る
             Line("");
